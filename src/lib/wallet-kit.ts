@@ -9,13 +9,33 @@ import {
 import { NETWORK_PASSPHRASE } from "./stellar";
 import { classifyAndThrow } from "./errors";
 
+/**
+ * Freighter's default isAvailable() is async and often loses the kit's 500ms race,
+ * which marks it "Not available" even when the extension is installed.
+ * Albedo/xBull always return true because they are web wallets (no extension check).
+ */
+class AppFreighterModule extends FreighterModule {
+  async isAvailable(): Promise<boolean> {
+    if (typeof window !== "undefined") {
+      const win = window as Window & { freighter?: boolean };
+      if (win.freighter) return true;
+    }
+
+    try {
+      return await super.isAvailable();
+    } catch {
+      return false;
+    }
+  }
+}
+
 let kit: StellarWalletsKit | null = null;
 
 export function getWalletKit(): StellarWalletsKit {
   if (!kit) {
     kit = new StellarWalletsKit({
       network: WalletNetwork.TESTNET,
-      modules: [new FreighterModule(), new AlbedoModule(), new xBullModule()],
+      modules: [new AppFreighterModule(), new AlbedoModule(), new xBullModule()],
     });
   }
   return kit;

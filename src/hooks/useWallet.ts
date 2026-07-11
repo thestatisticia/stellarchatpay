@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   connectWallet,
+  ensureFreighterAuthorized,
   fetchXlmBalance,
   fundTestnetAccount,
 } from "../lib/stellar";
@@ -84,6 +85,25 @@ export function useWallet() {
     await fundTestnetAccount(state.address);
     await refreshBalance(state.address);
   }, [state.address, refreshBalance]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const address = await ensureFreighterAuthorized();
+        if (cancelled) return;
+        setState((prev) => ({ ...prev, address }));
+        await refreshBalance(address);
+      } catch {
+        // Not connected yet — user will connect manually.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshBalance]);
 
   useEffect(() => {
     if (!state.address) return;

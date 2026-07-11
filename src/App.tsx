@@ -198,7 +198,7 @@ function App() {
 
       addMessage({
         role: "bot",
-        content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 8)}…${payment.destination.slice(-6)}\`\n\nApprove in Freighter when prompted.`,
+        content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 8)}…${payment.destination.slice(-6)}\`\n\nFreighter will ask you to approve this site and the transaction.`,
         status: "pending",
       });
 

@@ -1,4 +1,7 @@
 import {
+  getAddress,
+  getNetworkDetails,
+  isAllowed,
   isConnected,
   requestAccess,
   signTransaction,
@@ -32,7 +35,23 @@ export async function checkFreighterInstalled(): Promise<boolean> {
   return result.isConnected;
 }
 
-export async function connectWallet(): Promise<string> {
+async function assertTestnetNetwork(): Promise<void> {
+  const network = await getNetworkDetails();
+  if (network.error) {
+    throw new Error(network.error.message || "Could not read Freighter network");
+  }
+
+  if (network.networkPassphrase !== NETWORK_PASSPHRASE) {
+    throw new Error(
+      "Freighter must be on Testnet. Open Freighter → Settings → Network → Testnet."
+    );
+  }
+}
+
+/** Freighter allow-list is per domain — re-check before every sign on deployed sites. */
+export async function ensureFreighterAuthorized(
+  expectedAddress?: string
+): Promise<string> {
   const installed = await checkFreighterInstalled();
   if (!installed) {
     throw new Error(
@@ -40,16 +59,50 @@ export async function connectWallet(): Promise<string> {
     );
   }
 
-  const access = await requestAccess();
-  if (access.error) {
-    throw new Error(access.error.message || "Wallet connection denied");
+  await assertTestnetNetwork();
+
+  const allowed = await isAllowed();
+  if (!allowed.isAllowed || allowed.error) {
+    const access = await requestAccess();
+    if (access.error) {
+      throw new Error(
+        access.error.message ||
+          "Freighter access denied. Approve stellarchatpay.vercel.app in Freighter to sign."
+      );
+    }
+    if (!access.address) {
+      throw new Error("No wallet address returned from Freighter");
+    }
+    if (expectedAddress && access.address !== expectedAddress) {
+      throw new Error("Connected wallet changed. Disconnect and connect again.");
+    }
+    return access.address;
   }
 
-  if (!access.address) {
-    throw new Error("No wallet address returned from Freighter");
+  const current = await getAddress();
+  if (current.error || !current.address) {
+    const access = await requestAccess();
+    if (access.error) {
+      throw new Error(
+        access.error.message ||
+          "Could not access Freighter. Reconnect your wallet and try again."
+      );
+    }
+    if (!access.address) {
+      throw new Error("No wallet address returned from Freighter");
+    }
+    return access.address;
   }
 
-  return access.address;
+  if (expectedAddress && current.address !== expectedAddress) {
+    throw new Error("Active Freighter account changed. Disconnect and reconnect.");
+  }
+
+  return current.address;
+}
+
+export async function connectWallet(): Promise<string> {
+  return ensureFreighterAuthorized();
 }
 
 export function getAccountExplorerUrl(address: string): string {
@@ -96,6 +149,8 @@ export async function sendXlmPayment(
   destination: string,
   amount: string
 ): Promise<SendPaymentResult> {
+  await ensureFreighterAuthorized(sourcePublicKey);
+
   const account = await server.loadAccount(sourcePublicKey);
 
   const transaction = new TransactionBuilder(account, {

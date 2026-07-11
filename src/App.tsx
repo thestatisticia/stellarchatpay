@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatWindow } from "./components/ChatWindow";
 import { WalletHeader } from "./components/WalletHeader";
 import { usePaymentEvents } from "./hooks/usePaymentEvents";
@@ -10,6 +10,7 @@ import {
   WELCOME_MESSAGE,
   createMessage,
   parseBalanceCommand,
+  parseConfirmCommand,
   parseFundCommand,
   parseSendCommand,
   parseSwapCommand,
@@ -26,16 +27,19 @@ import {
   formatWalletError,
 } from "./lib/errors";
 import {
+  executeSwap,
   createUsdcTrustline,
   fetchAccountBalance,
   fetchAssetBalance,
   fetchXlmBalance,
+  formatSwapQuoteMessage,
   fundTestnetAccount,
   getAccountExplorerUrl,
+  getSwapQuote,
   hasUsdcTrustline,
   isValidStellarAddress,
   sendXlmPayment,
-  swapAssets,
+  type SwapQuote,
 } from "./lib/stellar";
 
 function App() {
@@ -44,6 +48,7 @@ function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const pendingSwap = useRef<SwapQuote | null>(null);
 
   const addMessage = useCallback((message: Omit<ChatMessage, "id" | "timestamp">) => {
     setMessages((prev) => [...prev, createMessage(message)]);
@@ -98,6 +103,7 @@ function App() {
   };
 
   const handleDisconnect = async () => {
+    pendingSwap.current = null;
     await wallet.disconnect();
     addMessage({ role: "system", content: "Wallet disconnected" });
     addMessage({
@@ -168,7 +174,7 @@ function App() {
           role: "bot",
           content: trusted
             ? `You've got **${balance} USDC** on testnet.`
-            : `No USDC trustline yet. Type \`trust usdc\` before swapping to USDC.`,
+            : `No USDC yet. Your first \`swap … to usdc\` adds a trustline automatically.`,
           status: trusted ? "success" : "info",
         });
       } catch (error) {
@@ -219,6 +225,53 @@ function App() {
       return;
     }
 
+    if (parseConfirmCommand(rawInput)) {
+      if (!wallet.address) return;
+
+      const quote = pendingSwap.current;
+      if (!quote) {
+        addMessage({
+          role: "bot",
+          content: "No swap waiting for confirmation. Start with `swap 10 xlm to usdc`.",
+          status: "info",
+        });
+        return;
+      }
+
+      addMessage({
+        role: "bot",
+        content: `Executing swap — **${quote.sendAmount} ${quote.fromLabel}** → **≈ ${quote.receiveAmount} ${quote.toLabel}**.\n\nApprove in your wallet when prompted.`,
+        status: "pending",
+      });
+
+      try {
+        const result = await executeSwap(
+          wallet.address,
+          quote,
+          wallet.signTransaction
+        );
+
+        pendingSwap.current = null;
+        await wallet.refreshBalance(wallet.address);
+
+        addMessage({
+          role: "bot",
+          content: `Swap complete — sent **${result.sendAmount} ${result.fromAsset}**, received **${result.receiveAmount} ${result.toAsset}**.`,
+          status: "success",
+          txHash: result.hash,
+          explorerUrl: result.explorerUrl,
+          amount: result.receiveAmount,
+        });
+      } catch (error) {
+        addMessage({
+          role: "bot",
+          content: formatWalletError(error),
+          status: "error",
+        });
+      }
+      return;
+    }
+
     const swap = parseSwapCommand(rawInput);
     if (swap) {
       if (!wallet.address) return;
@@ -233,15 +286,12 @@ function App() {
         return;
       }
 
-      const fromLabel = swap.from.toUpperCase();
-      const toLabel = swap.to.toUpperCase();
-
       try {
         await assertSufficientBalance(
           wallet.address,
           swap.amount,
           (address) => fetchAssetBalance(address, swap.from),
-          fromLabel
+          swap.from.toUpperCase()
         );
       } catch (error) {
         addMessage({
@@ -254,30 +304,27 @@ function App() {
 
       addMessage({
         role: "bot",
-        content: `Swapping **${swap.amount} ${fromLabel}** → **${toLabel}** via Stellar path payment.\n\nApprove in your wallet when prompted.`,
+        content: "Fetching swap quote from the testnet DEX…",
         status: "pending",
       });
 
       try {
-        const result = await swapAssets(
+        const quote = await getSwapQuote(
           wallet.address,
           swap.from,
           swap.amount,
-          swap.to,
-          wallet.signTransaction
+          swap.to
         );
 
-        await wallet.refreshBalance(wallet.address);
+        pendingSwap.current = quote;
 
         addMessage({
           role: "bot",
-          content: `Swap complete — sent **${result.sendAmount} ${result.fromAsset}**, received **${result.receiveAmount} ${result.toAsset}**.`,
-          status: "success",
-          txHash: result.hash,
-          explorerUrl: result.explorerUrl,
-          amount: result.receiveAmount,
+          content: formatSwapQuoteMessage(quote),
+          status: "info",
         });
       } catch (error) {
+        pendingSwap.current = null;
         addMessage({
           role: "bot",
           content: formatWalletError(error),

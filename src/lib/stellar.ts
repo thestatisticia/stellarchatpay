@@ -14,7 +14,6 @@ export const NETWORK_PASSPHRASE = Networks.TESTNET;
 export const FRIENDBOT_URL = "https://friendbot.stellar.org";
 
 const server = new Horizon.Server(HORIZON_URL);
-const PATH_PAYMENT_FEE = String(Number(BASE_FEE) * 100);
 
 export type SignTransactionFn = (
   xdr: string,
@@ -221,6 +220,189 @@ export interface SwapResult extends SendPaymentResult {
   receiveAmount: string;
 }
 
+export interface SwapQuote {
+  fromAsset: SwapAssetCode;
+  toAsset: SwapAssetCode;
+  sendAmount: string;
+  receiveAmount: string;
+  destMin: string;
+  fromLabel: string;
+  toLabel: string;
+  needsTrustline: boolean;
+  rate: string;
+}
+
+function swapAssetPair(from: SwapAssetCode, to: SwapAssetCode) {
+  return {
+    sendAsset: from === "xlm" ? Asset.native() : USDC_ASSET,
+    destAsset: to === "xlm" ? Asset.native() : USDC_ASSET,
+    fromLabel: from.toUpperCase(),
+    toLabel: to.toUpperCase(),
+  };
+}
+
+function pathMatchesDestination(
+  record: Horizon.ServerApi.PaymentPathRecord,
+  toAsset: SwapAssetCode
+): boolean {
+  if (toAsset === "xlm") {
+    return record.destination_asset_type === "native";
+  }
+  return (
+    record.destination_asset_code === "USDC" &&
+    record.destination_asset_issuer === USDC_ASSET.getIssuer()
+  );
+}
+
+function applySlippage(amount: string, percent = 1): string {
+  const value = parseFloat(amount);
+  if (Number.isNaN(value) || value <= 0) return amount;
+  return Math.max(value * (1 - percent / 100), 0.0000001).toFixed(7);
+}
+
+function formatRate(sendAmount: string, receiveAmount: string): string {
+  const send = parseFloat(sendAmount);
+  const receive = parseFloat(receiveAmount);
+  if (Number.isNaN(send) || send <= 0 || Number.isNaN(receive)) return "—";
+  return (receive / send).toFixed(7);
+}
+
+export async function getSwapQuote(
+  publicKey: string,
+  fromAsset: SwapAssetCode,
+  amount: string,
+  toAsset: SwapAssetCode
+): Promise<SwapQuote> {
+  if (fromAsset === toAsset) {
+    throw new Error("Pick two different assets to swap (e.g. XLM and USDC).");
+  }
+
+  const { sendAsset, destAsset, fromLabel, toLabel } = swapAssetPair(
+    fromAsset,
+    toAsset
+  );
+
+  const needsTrustline =
+    toAsset === "usdc" && !(await hasUsdcTrustline(publicKey));
+
+  const paths = await server
+    .strictSendPaths(sendAsset, amount, [destAsset])
+    .call();
+
+  const best = paths.records.find((record) => pathMatchesDestination(record, toAsset));
+
+  if (!best) {
+    throw new Error(
+      "No swap path found on the testnet DEX for this amount. Try a smaller amount or type `fund` if your account is new."
+    );
+  }
+
+  const receiveAmount = best.destination_amount;
+
+  return {
+    fromAsset,
+    toAsset,
+    sendAmount: best.source_amount,
+    receiveAmount,
+    destMin: applySlippage(receiveAmount),
+    fromLabel,
+    toLabel,
+    needsTrustline,
+    rate: formatRate(best.source_amount, receiveAmount),
+  };
+}
+
+export function formatSwapQuoteMessage(quote: SwapQuote): string {
+  const trustlineNote = quote.needsTrustline
+    ? "\n\nWe'll add a **USDC trustline** automatically in the same transaction (first time only)."
+    : "";
+
+  return `**Swap quote**
+
+You send **${quote.sendAmount} ${quote.fromLabel}**
+You receive **≈ ${quote.receiveAmount} ${quote.toLabel}**
+Rate **≈ ${quote.rate} ${quote.toLabel}** per ${quote.fromLabel}${trustlineNote}
+
+Type \`confirm\` to proceed and approve in your wallet.`;
+}
+
+export async function executeSwap(
+  publicKey: string,
+  quote: SwapQuote,
+  signTransaction: SignTransactionFn
+): Promise<SwapResult> {
+  const { sendAsset, destAsset, fromLabel, toLabel } = swapAssetPair(
+    quote.fromAsset,
+    quote.toAsset
+  );
+
+  const operationCount = quote.needsTrustline ? 2 : 1;
+  const fee = String(Number(BASE_FEE) * 100 * operationCount);
+
+  const response = await submitSignedTransaction(publicKey, signTransaction, (account) => {
+    const builder = new TransactionBuilder(account, {
+      fee,
+      networkPassphrase: NETWORK_PASSPHRASE,
+    });
+
+    if (quote.needsTrustline) {
+      builder.addOperation(
+        Operation.changeTrust({
+          asset: USDC_ASSET,
+          limit: "1000000",
+        })
+      );
+    }
+
+    builder.addOperation(
+      Operation.pathPaymentStrictSend({
+        destination: publicKey,
+        sendAsset,
+        sendAmount: quote.sendAmount,
+        destAsset,
+        destMin: quote.destMin,
+      })
+    );
+
+    return builder.setTimeout(30).build();
+  });
+
+  let receiveAmount = quote.receiveAmount;
+  try {
+    const operations = await server
+      .operations()
+      .forTransaction(response.hash)
+      .call();
+    const pathOp = operations.records.find(
+      (op) => op.type === "path_payment_strict_send"
+    ) as { amount?: string } | undefined;
+    if (pathOp?.amount) receiveAmount = pathOp.amount;
+  } catch {
+    // Horizon may lag; keep quoted receive amount.
+  }
+
+  return {
+    hash: response.hash,
+    explorerUrl: getExplorerUrl(response.hash),
+    fromAsset: fromLabel,
+    toAsset: toLabel,
+    sendAmount: quote.sendAmount,
+    receiveAmount,
+  };
+}
+
+/** @deprecated Use getSwapQuote + executeSwap for the confirm flow. */
+export async function swapAssets(
+  publicKey: string,
+  fromAsset: SwapAssetCode,
+  amount: string,
+  toAsset: SwapAssetCode,
+  signTransaction: SignTransactionFn
+): Promise<SwapResult> {
+  const quote = await getSwapQuote(publicKey, fromAsset, amount, toAsset);
+  return executeSwap(publicKey, quote, signTransaction);
+}
+
 async function submitSignedTransaction(
   publicKey: string,
   signTransaction: SignTransactionFn,
@@ -231,71 +413,6 @@ async function submitSignedTransaction(
   const signedXdr = await signTransaction(transaction.toXDR(), publicKey);
   const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
   return server.submitTransaction(signedTx);
-}
-
-export async function swapAssets(
-  publicKey: string,
-  fromAsset: SwapAssetCode,
-  amount: string,
-  toAsset: SwapAssetCode,
-  signTransaction: SignTransactionFn
-): Promise<SwapResult> {
-  if (fromAsset === toAsset) {
-    throw new Error("Pick two different assets to swap (e.g. XLM and USDC).");
-  }
-
-  if (toAsset === "usdc") {
-    const trusted = await hasUsdcTrustline(publicKey);
-    if (!trusted) {
-      throw new Error(
-        "Add a USDC trustline first. Type `trust usdc` then try the swap again."
-      );
-    }
-  }
-
-  const sendAsset = fromAsset === "xlm" ? Asset.native() : USDC_ASSET;
-  const destAsset = toAsset === "xlm" ? Asset.native() : USDC_ASSET;
-  const fromLabel = fromAsset.toUpperCase();
-  const toLabel = toAsset.toUpperCase();
-
-  const response = await submitSignedTransaction(publicKey, signTransaction, (account) =>
-    new TransactionBuilder(account, {
-      fee: PATH_PAYMENT_FEE,
-      networkPassphrase: NETWORK_PASSPHRASE,
-    })
-      .addOperation(
-        Operation.pathPaymentStrictSend({
-          destination: publicKey,
-          sendAsset,
-          sendAmount: amount,
-          destAsset,
-          destMin: "0.0000001",
-        })
-      )
-      .setTimeout(30)
-      .build()
-  );
-
-  let receiveAmount = amount;
-  try {
-    const operations = await server
-      .operations()
-      .forTransaction(response.hash)
-      .call();
-    const operation = operations.records[0] as { amount?: string } | undefined;
-    if (operation?.amount) receiveAmount = operation.amount;
-  } catch {
-    // Fall back to send amount if Horizon hasn't indexed the tx yet.
-  }
-
-  return {
-    hash: response.hash,
-    explorerUrl: getExplorerUrl(response.hash),
-    fromAsset: fromLabel,
-    toAsset: toLabel,
-    sendAmount: amount,
-    receiveAmount,
-  };
 }
 
 export async function sendXlmPayment(

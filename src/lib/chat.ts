@@ -55,6 +55,12 @@ const SWAP_PATTERNS = [
 
 const TRUST_PATTERNS = [/^trust\s+usdc$/i, /^add\s+usdc\s+trustline$/i];
 
+const CONFIRM_PATTERNS = [/^confirm(?:\s+swap)?$/i, /^yes$/i];
+
+export function parseConfirmCommand(input: string): boolean {
+  return CONFIRM_PATTERNS.some((pattern) => pattern.test(input.trim()));
+}
+
 export function parseTrustCommand(input: string): boolean {
   return TRUST_PATTERNS.some((pattern) => pattern.test(input.trim()));
 }
@@ -123,8 +129,7 @@ Tap a quick action below or type a command:
 • \`fund\` — fund your wallet via Friendbot
 • \`fund G...\` — fund any testnet wallet
 • \`activity\` — live payment feed from the Soroban contract
-• \`swap 10 xlm to usdc\` — swap on the Stellar DEX (testnet)
-• \`trust usdc\` — add USDC trustline before swapping
+• \`swap 10 xlm to usdc\` — get a quote, then type \`confirm\`
 • \`send 10 to G...\` — pay someone (logged on-chain)
 
 Connect via **Freighter, Albedo, or xBull** using the wallet picker.`;
@@ -137,9 +142,10 @@ export const HELP_MESSAGE = `**Commands**
 \`check G...\` — alias for balance lookup
 \`fund\` — Friendbot funding for your wallet
 \`fund G...\` — Friendbot funding for any address
-\`trust usdc\` — add a USDC trustline (required before receiving USDC)
-\`swap 10 xlm to usdc\` — swap XLM → USDC via path payment
-\`swap 1 usdc to xlm\` — swap USDC → XLM
+\`swap 10 xlm to usdc\` — quote from the DEX, then \`confirm\`
+\`swap 1 usdc to xlm\` — swap USDC → XLM (quote + confirm)
+\`trust usdc\` — manually add USDC trustline (optional; first USDC swap adds it automatically)
+\`confirm\` — approve a pending swap quote
 \`activity\` — recent payments from the on-chain activity feed
 \`send <amount> to <address>\` — send a payment (also logged to contract)
 

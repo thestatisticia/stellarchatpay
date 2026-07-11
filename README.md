@@ -9,7 +9,7 @@ Instead of traditional forms, you connect your Freighter wallet and type command
 ## Features
 
 - **Freighter wallet** connect and disconnect on Stellar testnet
-- **Live XLM balance** in the header (auto-refreshes every 15s)
+- **Live XLM balance** in the header after connecting
 - **Any-wallet balance lookup** — check any testnet address via chat
 - **Chat-based payments** — send XLM with natural commands
 - **Friendbot funding** — type `fund` to get testnet XLM for new accounts

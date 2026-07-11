@@ -82,7 +82,7 @@ function App() {
       addMessage({ role: "system", content: `Connected via ${walletName}` });
       addMessage({
         role: "bot",
-        content: `You're live on testnet as \`${address.slice(0, 8)}…${address.slice(-6)}\` via **${walletName}**.\n\nNew account? Type \`fund\`. Try \`activity\` for the on-chain feed.`,
+        content: `Connected via **${walletName}** as \`${address.slice(0, 8)}…${address.slice(-6)}\`.\n\nType \`fund\` if this is a new testnet account, or \`balance\` to check your XLM.`,
         status: "success",
       });
     } catch (error) {
@@ -290,7 +290,7 @@ function App() {
     if (command === "balance") {
       if (!wallet.address) return;
       try {
-        const balance = await wallet.refreshBalance(wallet.address);
+        const { balance } = await wallet.refreshBalance(wallet.address);
         addMessage({
           role: "bot",
           content: `You've got **${balance} XLM** on testnet.`,
@@ -403,7 +403,9 @@ function App() {
       });
       try {
         const result = await wallet.fundAccount();
-        const balance = wallet.balance ?? (await wallet.refreshBalance(wallet.address));
+        const balance =
+          wallet.balance ??
+          (await wallet.refreshBalance(wallet.address)).balance;
 
         addMessage({
           role: "bot",

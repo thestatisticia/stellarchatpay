@@ -3,6 +3,7 @@ import {
   BASE_FEE,
   Horizon,
   Networks,
+  NotFoundError,
   Operation,
   TransactionBuilder,
 } from "@stellar/stellar-sdk";
@@ -39,6 +40,12 @@ export function getAccountExplorerUrl(address: string): string {
   return `https://stellar.expert/explorer/testnet/account/${address}`;
 }
 
+function isMissingAccount(error: unknown): boolean {
+  if (error instanceof NotFoundError) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("404") || message.toLowerCase().includes("not found");
+}
+
 function isCreditBalance(
   balance: Horizon.HorizonApi.BalanceLine
 ): balance is Horizon.HorizonApi.BalanceLineAsset<
@@ -48,24 +55,6 @@ function isCreditBalance(
     balance.asset_type === "credit_alphanum4" ||
     balance.asset_type === "credit_alphanum12"
   );
-}
-
-function balanceForAsset(
-  balances: Horizon.HorizonApi.BalanceLine[],
-  asset: Asset
-): string {
-  if (asset.isNative()) {
-    const native = balances.find((b) => b.asset_type === "native");
-    return native?.balance ?? "0";
-  }
-
-  const match = balances.find(
-    (b) =>
-      isCreditBalance(b) &&
-      b.asset_code === asset.getCode() &&
-      b.asset_issuer === asset.getIssuer()
-  );
-  return match?.balance ?? "0";
 }
 
 export async function fetchAccountBalances(publicKey: string): Promise<{
@@ -93,8 +82,7 @@ export async function fetchAccountBalances(publicKey: string): Promise<{
     });
     return { balances, exists: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("404") || message.toLowerCase().includes("not found")) {
+    if (isMissingAccount(error)) {
       return { balances: [], exists: false };
     }
     throw error;
@@ -119,11 +107,14 @@ export async function fetchAssetBalance(
   publicKey: string,
   assetCode: SwapAssetCode
 ): Promise<string> {
-  const account = await server.loadAccount(publicKey);
+  const { balances, exists } = await fetchAccountBalances(publicKey);
+  if (!exists) return "0";
+
   if (assetCode === "xlm") {
-    return balanceForAsset(account.balances, Asset.native());
+    return balances.find((b) => b.code === "XLM")?.balance ?? "0";
   }
-  return balanceForAsset(account.balances, USDC_ASSET);
+
+  return balances.find((b) => b.code === "USDC")?.balance ?? "0";
 }
 
 export async function hasUsdcTrustline(publicKey: string): Promise<boolean> {

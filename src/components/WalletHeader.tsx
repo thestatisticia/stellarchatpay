@@ -67,8 +67,10 @@ export function WalletHeader({
                     className="inline-block h-4 w-14 animate-pulse rounded"
                     style={{ background: "var(--surface-3)" }}
                   />
+                ) : balance === null ? (
+                  "— XLM"
                 ) : (
-                  `${balance ?? "0"} XLM`
+                  `${balance} XLM`
                 )}
               </p>
             </div>
@@ -102,7 +104,7 @@ export function WalletHeader({
               {truncateAddress(address, 6)}
             </span>
             <span className="font-semibold tabular-nums" style={{ color: "var(--text)" }}>
-              {isLoadingBalance ? "…" : `${balance ?? "0"} XLM`}
+              {isLoadingBalance ? "…" : balance === null ? "— XLM" : `${balance} XLM`}
             </span>
           </div>
         </div>

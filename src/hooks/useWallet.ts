@@ -4,7 +4,7 @@ import {
   openWalletModal,
   signWithWalletKit,
 } from "../lib/wallet-kit";
-import { fetchXlmBalance, fundTestnetAccount, type SignTransactionFn } from "../lib/stellar";
+import { fetchAccountBalance, fundTestnetAccount, type SignTransactionFn } from "../lib/stellar";
 import { classifyAndThrow } from "../lib/errors";
 
 interface WalletState {
@@ -33,22 +33,23 @@ export function useWallet() {
       error: null,
     }));
     try {
-      const balance = await fetchXlmBalance(address);
+      const { balance, exists } = await fetchAccountBalance(address);
       setState((prev) => ({
         ...prev,
         balance,
         isLoadingBalance: false,
       }));
-      return balance;
+      return { balance, exists };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to fetch balance";
       setState((prev) => ({
         ...prev,
+        balance: "0",
         isLoadingBalance: false,
         error: message,
       }));
-      throw error;
+      return { balance: "0", exists: false };
     }
   }, []);
 
@@ -61,9 +62,11 @@ export function useWallet() {
         address,
         walletName,
         isConnecting: false,
+        balance: null,
+        isLoadingBalance: false,
       }));
-      await refreshBalance(address);
-      return { address, walletName };
+
+      return { address, walletName, accountExists: null as boolean | null };
     } catch (error) {
       setState((prev) => ({ ...prev, isConnecting: false }));
       classifyAndThrow(error);

@@ -5,6 +5,7 @@ import { ThemeToggle } from "./ThemeToggle";
 interface WalletHeaderProps {
   address: string | null;
   balance: string | null;
+  walletName: string | null;
   isConnecting: boolean;
   isLoadingBalance: boolean;
   isConnected: boolean;
@@ -16,6 +17,7 @@ interface WalletHeaderProps {
 
 export function WalletHeader({
   address,
+  walletName,
   balance,
   isConnecting,
   isLoadingBalance,
@@ -51,6 +53,11 @@ export function WalletHeader({
 
           {isConnected && address && (
             <div className="wallet-pill hidden rounded-lg px-3 py-1.5 text-right md:block">
+              {walletName && (
+                <p className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>
+                  {walletName}
+                </p>
+              )}
               <p className="font-mono text-[10px]" style={{ color: "var(--text-muted)" }}>
                 {truncateAddress(address, 6)}
               </p>

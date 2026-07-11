@@ -1,20 +1,25 @@
 import { useCallback, useState } from "react";
 import {
-  connectWallet,
-  fetchXlmBalance,
-  fundTestnetAccount,
-} from "../lib/stellar";
+  disconnectWalletKit,
+  openWalletModal,
+  signWithWalletKit,
+} from "../lib/wallet-kit";
+import { fetchXlmBalance, fundTestnetAccount, type SignTransactionFn } from "../lib/stellar";
+import { classifyAndThrow } from "../lib/errors";
 
 interface WalletState {
   address: string | null;
+  walletName: string | null;
   balance: string | null;
   isConnecting: boolean;
   isLoadingBalance: boolean;
   error: string | null;
 }
+
 export function useWallet() {
   const [state, setState] = useState<WalletState>({
     address: null,
+    walletName: null,
     balance: null,
     isConnecting: false,
     isLoadingBalance: false,
@@ -50,29 +55,26 @@ export function useWallet() {
   const connect = useCallback(async () => {
     setState((prev) => ({ ...prev, isConnecting: true, error: null }));
     try {
-      const address = await connectWallet();
+      const { address, walletName } = await openWalletModal();
       setState((prev) => ({
         ...prev,
         address,
+        walletName,
         isConnecting: false,
       }));
       await refreshBalance(address);
-      return address;
+      return { address, walletName };
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to connect wallet";
-      setState((prev) => ({
-        ...prev,
-        isConnecting: false,
-        error: message,
-      }));
-      throw error;
+      setState((prev) => ({ ...prev, isConnecting: false }));
+      classifyAndThrow(error);
     }
   }, [refreshBalance]);
 
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback(async () => {
+    await disconnectWalletKit();
     setState({
       address: null,
+      walletName: null,
       balance: null,
       isConnecting: false,
       isLoadingBalance: false,
@@ -88,6 +90,12 @@ export function useWallet() {
     await refreshBalance(state.address);
     return result;
   }, [state.address, refreshBalance]);
+
+  const signTransaction: SignTransactionFn = useCallback(
+    async (xdr, address) => signWithWalletKit(xdr, address),
+    []
+  );
+
   return {
     ...state,
     isConnected: Boolean(state.address),
@@ -95,5 +103,6 @@ export function useWallet() {
     disconnect,
     refreshBalance,
     fundAccount,
+    signTransaction,
   };
 }

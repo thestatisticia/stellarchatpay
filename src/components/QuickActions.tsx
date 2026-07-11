@@ -7,6 +7,7 @@ export function QuickActions({ disabled, onSelect }: QuickActionsProps) {
   const actions = [
     { label: "Balance", command: "balance" },
     { label: "Fund", command: "fund" },
+    { label: "Swap", command: "swap 10 xlm to usdc" },
     { label: "Activity", command: "activity" },
     { label: "Help", command: "help" },
   ];

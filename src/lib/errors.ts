@@ -45,6 +45,10 @@ function parseRawMessage(message: string): string {
     return "You rejected the request in your wallet. Nothing was sent.";
   }
 
+  if (lower.includes("wallet selection cancelled")) {
+    return "Wallet connection cancelled.";
+  }
+
   if (
     lower.includes("underfunded") ||
     lower.includes("insufficient") ||
@@ -103,14 +107,15 @@ export function classifyAndThrow(error: unknown): never {
 export async function assertSufficientBalance(
   address: string,
   amount: string,
-  fetchBalance: (address: string) => Promise<string>
+  fetchBalance: (address: string) => Promise<string>,
+  assetLabel = "XLM"
 ): Promise<void> {
   const balance = parseFloat(await fetchBalance(address));
-  const needed = parseFloat(amount) + 0.00001;
+  const needed = parseFloat(amount) + (assetLabel === "XLM" ? 0.00001 : 0);
   if (Number.isNaN(balance) || balance < needed) {
     throw new AppWalletError(
       "INSUFFICIENT_BALANCE",
-      `Insufficient balance. You have ${balance} XLM but need at least ${needed.toFixed(5)} XLM (amount + fee).`
+      `Insufficient ${assetLabel} balance. You have ${balance} ${assetLabel} but need at least ${needed.toFixed(assetLabel === "USDC" ? 2 : 5)} ${assetLabel}.`
     );
   }
 }

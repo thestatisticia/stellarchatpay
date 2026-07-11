@@ -30,6 +30,7 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 - **Any-wallet balance lookup** — `balance G...`
 - **Friendbot funding** — `fund` or `fund G...`
 - **Chat-based payments** — send XLM with natural commands
+- **DEX swaps in chat** — swap XLM ↔ USDC via path payments on testnet
 - **On-chain activity log** — Soroban contract + event feed
 - **Transaction feedback** — pending / success / failure with explorer links
 
@@ -43,6 +44,10 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 | `fund` | Friendbot funding for your wallet |
 | `fund G...` | Friendbot funding for any address |
 | `activity` | Recent payments from the Soroban contract |
+| `trust usdc` | Add USDC trustline (required before swapping to USDC) |
+| `swap 10 xlm to usdc` | Swap XLM → USDC via Stellar path payment |
+| `swap 1 usdc to xlm` | Swap USDC → XLM |
+| `balance usdc` | Show your USDC balance |
 | `send 10 to G...` | Send XLM (also logged on-chain when contract is configured) |
 | `pay 5 G...` | Alias for send |
 
@@ -107,13 +112,13 @@ npm run preview
 
 ## Contract (Yellow Belt)
 
-> Update after deployment:
-
 | Field | Value |
 |-------|-------|
-| **Contract ID** | `TBD — run npm run contract:deploy` |
-| **Contract call tx** | `TBD — after first payment + log_payment` |
+| **Contract ID** | `CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` |
+| **Deploy tx** | [2186cfb1…](https://stellar.expert/explorer/testnet/tx/2186cfb1d919bf260f3fbe1ad5178de75a717391d42399b395fcb5c397b05e04) |
 | **Network** | Stellar Testnet |
+
+Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` in Vercel and redeploy.
 
 ## Screenshots
 
@@ -151,7 +156,7 @@ npm run preview
 - [x] Real-time event polling + `activity` command
 - [x] Transaction status (pending / success / fail)
 - [ ] Contract deployed on testnet (set `VITE_CONTRACT_ID`)
-- [ ] Contract address + contract call tx hash in README
+- [x] Contract address + deploy tx hash in README
 - [ ] Screenshot: wallet options modal
 - [x] 2+ meaningful commits on same repo
 

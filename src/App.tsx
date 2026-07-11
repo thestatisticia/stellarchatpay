@@ -12,6 +12,8 @@ import {
   parseBalanceCommand,
   parseFundCommand,
   parseSendCommand,
+  parseSwapCommand,
+  parseTrustCommand,
   type ChatMessage,
 } from "./lib/chat";
 import {
@@ -24,12 +26,16 @@ import {
   formatWalletError,
 } from "./lib/errors";
 import {
+  createUsdcTrustline,
   fetchAccountBalance,
+  fetchAssetBalance,
   fetchXlmBalance,
   fundTestnetAccount,
   getAccountExplorerUrl,
+  hasUsdcTrustline,
   isValidStellarAddress,
   sendXlmPayment,
+  swapAssets,
 } from "./lib/stellar";
 
 function App() {
@@ -80,11 +86,14 @@ function App() {
         status: "success",
       });
     } catch (error) {
-      addMessage({
-        role: "bot",
-        content: formatWalletError(error),
-        status: "error",
-      });
+      const message = formatWalletError(error);
+      if (!message.toLowerCase().includes("cancelled")) {
+        addMessage({
+          role: "bot",
+          content: message,
+          status: "error",
+        });
+      }
     }
   };
 
@@ -139,6 +148,134 @@ function App() {
           role: "bot",
           content: `**Recent activity** (${events.length} event${events.length === 1 ? "" : "s"})\n\n${lines.join("\n")}${count !== null ? `\n\nTotal logged: **${count}**` : ""}`,
           status: "success",
+        });
+      } catch (error) {
+        addMessage({
+          role: "bot",
+          content: formatWalletError(error),
+          status: "error",
+        });
+      }
+      return;
+    }
+
+    if (command === "balance usdc") {
+      if (!wallet.address) return;
+      try {
+        const balance = await fetchAssetBalance(wallet.address, "usdc");
+        const trusted = await hasUsdcTrustline(wallet.address);
+        addMessage({
+          role: "bot",
+          content: trusted
+            ? `You've got **${balance} USDC** on testnet.`
+            : `No USDC trustline yet. Type \`trust usdc\` before swapping to USDC.`,
+          status: trusted ? "success" : "info",
+        });
+      } catch (error) {
+        addMessage({
+          role: "bot",
+          content: formatWalletError(error),
+          status: "error",
+        });
+      }
+      return;
+    }
+
+    if (parseTrustCommand(rawInput)) {
+      if (!wallet.address) return;
+
+      try {
+        const trusted = await hasUsdcTrustline(wallet.address);
+        if (trusted) {
+          addMessage({
+            role: "bot",
+            content: "Your wallet already has a USDC trustline. Try `swap 10 xlm to usdc`.",
+            status: "info",
+          });
+          return;
+        }
+
+        addMessage({
+          role: "bot",
+          content: "Adding USDC trustline… approve in your wallet.",
+          status: "pending",
+        });
+
+        const result = await createUsdcTrustline(wallet.address, wallet.signTransaction);
+        addMessage({
+          role: "bot",
+          content: "USDC trustline added. You can now swap XLM ↔ USDC on testnet.",
+          status: "success",
+          txHash: result.hash,
+          explorerUrl: result.explorerUrl,
+        });
+      } catch (error) {
+        addMessage({
+          role: "bot",
+          content: formatWalletError(error),
+          status: "error",
+        });
+      }
+      return;
+    }
+
+    const swap = parseSwapCommand(rawInput);
+    if (swap) {
+      if (!wallet.address) return;
+
+      const amount = parseFloat(swap.amount);
+      if (Number.isNaN(amount) || amount <= 0) {
+        addMessage({
+          role: "bot",
+          content: "Enter an amount greater than 0.",
+          status: "error",
+        });
+        return;
+      }
+
+      const fromLabel = swap.from.toUpperCase();
+      const toLabel = swap.to.toUpperCase();
+
+      try {
+        await assertSufficientBalance(
+          wallet.address,
+          swap.amount,
+          (address) => fetchAssetBalance(address, swap.from),
+          fromLabel
+        );
+      } catch (error) {
+        addMessage({
+          role: "bot",
+          content: formatWalletError(error),
+          status: "error",
+        });
+        return;
+      }
+
+      addMessage({
+        role: "bot",
+        content: `Swapping **${swap.amount} ${fromLabel}** → **${toLabel}** via Stellar path payment.\n\nApprove in your wallet when prompted.`,
+        status: "pending",
+      });
+
+      try {
+        const result = await swapAssets(
+          wallet.address,
+          swap.from,
+          swap.amount,
+          swap.to,
+          wallet.signTransaction
+        );
+
+        await wallet.refreshBalance(wallet.address);
+
+        addMessage({
+          role: "bot",
+          content: `Swap complete — sent **${result.sendAmount} ${result.fromAsset}**, received **${result.receiveAmount} ${result.toAsset}**.`,
+          status: "success",
+          txHash: result.hash,
+          explorerUrl: result.explorerUrl,
+          amount: result.receiveAmount,
         });
       } catch (error) {
         addMessage({
@@ -402,7 +539,7 @@ function App() {
 
     addMessage({
       role: "bot",
-      content: "Didn't catch that. Try `help`, or:\n`send 10 to G...`",
+      content: "Didn't catch that. Try `help`, or:\n`send 10 to G...`\n`swap 10 xlm to usdc`",
       status: "error",
     });
   };

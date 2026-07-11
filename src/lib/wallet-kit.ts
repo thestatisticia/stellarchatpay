@@ -3,7 +3,7 @@ import {
   FreighterModule,
   StellarWalletsKit,
   WalletNetwork,
-  XBULL_ID,
+  xBullModule,
   type ISupportedWallet,
 } from "@creit.tech/stellar-wallets-kit";
 import { NETWORK_PASSPHRASE } from "./stellar";
@@ -15,8 +15,7 @@ export function getWalletKit(): StellarWalletsKit {
   if (!kit) {
     kit = new StellarWalletsKit({
       network: WalletNetwork.TESTNET,
-      selectedWalletId: XBULL_ID,
-      modules: [new FreighterModule(), new AlbedoModule()],
+      modules: [new FreighterModule(), new AlbedoModule(), new xBullModule()],
     });
   }
   return kit;
@@ -46,7 +45,11 @@ export async function openWalletModal(): Promise<WalletConnection> {
         }
       },
       onClosed: (err) => {
-        reject(err ?? new Error("Wallet not found or selection cancelled"));
+        if (err) {
+          reject(err);
+          return;
+        }
+        reject(new Error("Wallet selection cancelled"));
       },
     });
   });
@@ -81,5 +84,5 @@ export async function signWithWalletKit(
 }
 
 export function listSupportedWallets(): string[] {
-  return ["Freighter", "Albedo", "xBull (via modal)"];
+  return ["Freighter", "Albedo", "xBull"];
 }

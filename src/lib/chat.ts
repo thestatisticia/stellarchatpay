@@ -19,6 +19,12 @@ export interface ParsedSendCommand {
   destination: string;
 }
 
+export interface ParsedSwapCommand {
+  amount: string;
+  from: "xlm" | "usdc";
+  to: "xlm" | "usdc";
+}
+
 const SEND_PATTERNS = [
   /^(?:send|pay|transfer)\s+(\d+(?:\.\d+)?)\s*(?:xlm)?\s+(?:to\s+)?(G[A-Z2-7]{55})$/i,
   /^(?:send|pay|transfer)\s+(\d+(?:\.\d+)?)\s+to\s+(G[A-Z2-7]{55})$/i,
@@ -41,6 +47,31 @@ const FUND_PATTERNS = [
   /^fund\s+(?:wallet\s+)?(G[A-Z2-7]{55})$/i,
   /^fund\s+(?:account\s+)?(G[A-Z2-7]{55})$/i,
 ];
+
+const SWAP_PATTERNS = [
+  /^swap\s+(\d+(?:\.\d+)?)\s+(xlm|usdc)\s+(?:to|for|into)\s+(xlm|usdc)$/i,
+  /^exchange\s+(\d+(?:\.\d+)?)\s+(xlm|usdc)\s+(?:to|for|into)\s+(xlm|usdc)$/i,
+];
+
+const TRUST_PATTERNS = [/^trust\s+usdc$/i, /^add\s+usdc\s+trustline$/i];
+
+export function parseTrustCommand(input: string): boolean {
+  return TRUST_PATTERNS.some((pattern) => pattern.test(input.trim()));
+}
+
+export function parseSwapCommand(input: string): ParsedSwapCommand | null {
+  const trimmed = input.trim();
+  for (const pattern of SWAP_PATTERNS) {
+    const match = trimmed.match(pattern);
+    if (match) {
+      const from = match[2].toLowerCase() as "xlm" | "usdc";
+      const to = match[3].toLowerCase() as "xlm" | "usdc";
+      if (from === to) return null;
+      return { amount: match[1], from, to };
+    }
+  }
+  return null;
+}
 
 export function parseFundCommand(input: string): string | null {
   const trimmed = input.trim();
@@ -92,6 +123,8 @@ Tap a quick action below or type a command:
 • \`fund\` — fund your wallet via Friendbot
 • \`fund G...\` — fund any testnet wallet
 • \`activity\` — live payment feed from the Soroban contract
+• \`swap 10 xlm to usdc\` — swap on the Stellar DEX (testnet)
+• \`trust usdc\` — add USDC trustline before swapping
 • \`send 10 to G...\` — pay someone (logged on-chain)
 
 Connect via **Freighter, Albedo, or xBull** using the wallet picker.`;
@@ -99,10 +132,14 @@ Connect via **Freighter, Albedo, or xBull** using the wallet picker.`;
 export const HELP_MESSAGE = `**Commands**
 
 \`balance\` — your XLM balance
+\`balance usdc\` — your USDC balance on testnet
 \`balance G...\` — balance of any testnet address
 \`check G...\` — alias for balance lookup
 \`fund\` — Friendbot funding for your wallet
 \`fund G...\` — Friendbot funding for any address
+\`trust usdc\` — add a USDC trustline (required before receiving USDC)
+\`swap 10 xlm to usdc\` — swap XLM → USDC via path payment
+\`swap 1 usdc to xlm\` — swap USDC → XLM
 \`activity\` — recent payments from the on-chain activity feed
 \`send <amount> to <address>\` — send a payment (also logged to contract)
 
@@ -110,5 +147,6 @@ export const HELP_MESSAGE = `**Commands**
 • \`pay 5 G...\`
 • \`transfer 2 XLM to G...\`
 • \`10 xlm to G...\`
+• \`exchange 5 usdc to xlm\`
 
 **Tip:** Stellar addresses always start with \`G\` and are 56 characters long.`;

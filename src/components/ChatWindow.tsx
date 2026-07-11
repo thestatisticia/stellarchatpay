@@ -56,20 +56,20 @@ export function ChatWindow({
               Connect your wallet
             </h2>
             <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
-              Link Freighter on Stellar testnet to send payments, check balances, and manage XLM through chat commands.
+              Pick Freighter, Albedo, or xBull on Stellar testnet to send payments, swap assets, and manage XLM through chat commands.
             </p>
             <ul className="mt-4 space-y-2 text-sm" style={{ color: "var(--text-secondary)" }}>
               <li className="flex items-center gap-2">
                 <span className="connect-step">1</span>
-                Install Freighter and switch to Testnet
+                Use a Stellar wallet on testnet
               </li>
               <li className="flex items-center gap-2">
                 <span className="connect-step">2</span>
-                Connect below and type <code className="code-inline">fund</code> if needed
+                Click below and choose your wallet
               </li>
               <li className="flex items-center gap-2">
                 <span className="connect-step">3</span>
-                Send with <code className="code-inline">send 10 to G...</code>
+                Type <code className="code-inline">fund</code> if needed, then try <code className="code-inline">send 10 to G...</code>
               </li>
             </ul>
             <button
@@ -78,12 +78,20 @@ export function ChatWindow({
               disabled={isConnecting}
               className="btn-primary mt-6 w-full rounded-lg px-4 py-2.5 text-sm font-medium"
             >
-              {isConnecting ? "Connecting…" : "Connect Freighter Wallet"}
+              {isConnecting ? "Connecting…" : "Connect Wallet"}
             </button>
             <p className="mt-4 text-center text-xs" style={{ color: "var(--text-faint)" }}>
-              No Freighter?{" "}
+              Need a wallet?{" "}
               <a href="https://www.freighter.app" target="_blank" rel="noopener noreferrer" className="text-link">
-                Download extension
+                Freighter
+              </a>
+              {" · "}
+              <a href="https://albedo.link" target="_blank" rel="noopener noreferrer" className="text-link">
+                Albedo
+              </a>
+              {" · "}
+              <a href="https://xbull.app" target="_blank" rel="noopener noreferrer" className="text-link">
+                xBull
               </a>
             </p>
           </div>

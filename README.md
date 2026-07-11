@@ -2,6 +2,8 @@
 
 Send XLM payments through a chat interface on the **Stellar testnet**. Built for the RiseIn White Belt challenge.
 
+**Live demo:** [https://stellarchatpay.vercel.app/](https://stellarchatpay.vercel.app/)
+
 Instead of traditional forms, you connect your Freighter wallet and type commands like `send 10 to G...` to move testnet XLM. The app handles wallet connection, balance display, and transaction feedback inline in the conversation.
 
 ## Features
@@ -68,6 +70,8 @@ npm run preview
 
 ## Deploy
 
+**Live app:** [https://stellarchatpay.vercel.app/](https://stellarchatpay.vercel.app/)
+
 This project includes a `vercel.json` for easy deployment:
 
 1. Push to GitHub
@@ -76,19 +80,27 @@ This project includes a `vercel.json` for easy deployment:
 
 ## Screenshots
 
-### Wallet connected + balance displayed
-
-Header shows the connected address and live XLM balance. Chat confirms successful Freighter connection on testnet.
+### Wallet connected + balance in header
 
 ![Wallet connected with balance](screenshots/wallet-connected.png)
+
+### Balance check via chat
+
+Type `balance` to fetch and display your XLM on testnet.
+
+![Balance check](screenshots/balance-check.png)
+
+### Successful XLM payment
+
+Send command with processing state, confirmation card, transaction hash, and Stellar Expert link.
+
+![Payment success](screenshots/payment-success.png)
 
 ### Error handling
 
 Unrecognized commands return clear feedback with suggested alternatives.
 
 ![Error handling](screenshots/error-handling.png)
-
-> **Tip:** For a stronger submission, also add screenshots of a successful `send` transaction with the tx hash and Stellar Expert link.
 
 ## Submission Checklist (White Belt)
 
@@ -98,10 +110,9 @@ Unrecognized commands return clear feedback with suggested alternatives.
 - [x] Fetch and display XLM balance
 - [x] Send XLM transaction on testnet
 - [x] Show success/failure + transaction hash
-- [x] Public GitHub repository
-- [x] README screenshots (connection + error handling)
-- [ ] Deployed live URL
-- [ ] Screenshot: successful testnet transaction with tx hash
+- [x] Public GitHub repository — [thestatisticia/stellarchatpay](https://github.com/thestatisticia/stellarchatpay)
+- [x] Live demo — [stellarchatpay.vercel.app](https://stellarchatpay.vercel.app/)
+- [x] README with setup instructions and screenshots
 
 ## License
 

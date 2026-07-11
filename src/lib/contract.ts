@@ -78,20 +78,44 @@ export async function logPaymentOnContract(
     throw new Error("Network busy. Please try the contract log again.");
   }
 
-  let getResult = await soroban.getTransaction(result.hash);
-  while (getResult.status === "NOT_FOUND") {
-    await new Promise((r) => setTimeout(r, 1000));
-    getResult = await soroban.getTransaction(result.hash);
-  }
-
-  if (getResult.status !== "SUCCESS") {
-    throw new Error("Contract call failed on network");
-  }
+  await waitForSuccessfulContractTx(result.hash);
 
   return {
     hash: result.hash,
     explorerUrl: `https://stellar.expert/explorer/testnet/tx/${result.hash}`,
   };
+}
+
+async function waitForSuccessfulContractTx(hash: string): Promise<void> {
+  const deadline = Date.now() + 30_000;
+
+  while (Date.now() < deadline) {
+    try {
+      const getResult = await soroban.getTransaction(hash);
+
+      if (getResult.status === "NOT_FOUND") {
+        await new Promise((r) => setTimeout(r, 1000));
+        continue;
+      }
+
+      if (getResult.status === "FAILED") {
+        throw new Error("Contract call failed on network");
+      }
+
+      if (getResult.status === "SUCCESS") {
+        return;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("Bad union switch")) {
+        throw error;
+      }
+      // Older SDKs threw here while the tx was still confirming; retry briefly.
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+
+  throw new Error("Contract call timed out while waiting for confirmation");
 }
 
 export async function fetchRecentPaymentEvents(

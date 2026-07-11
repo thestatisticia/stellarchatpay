@@ -1,19 +1,37 @@
 # StellarChat Pay
 
-Send XLM payments through a chat interface on the **Stellar testnet**. Built for the RiseIn White Belt challenge.
+Send XLM payments through a chat interface on the **Stellar testnet**. Built for the RiseIn Stellar Developer Challenge.
 
 **Live demo:** [https://stellarchatpay.vercel.app/](https://stellarchatpay.vercel.app/)
 
-Instead of traditional forms, you connect your Freighter wallet and type commands like `send 10 to G...` to move testnet XLM. The app handles wallet connection, balance display, and transaction feedback inline in the conversation.
+Instead of traditional forms, you connect a Stellar wallet and type commands like `send 10 to G...` to move testnet XLM. Payments can be logged to a Soroban contract with a live activity feed in chat.
+
+---
+
+## Level 1 — White Belt (complete)
+
+- Freighter wallet connect/disconnect on testnet
+- Balance display + send XLM
+- Transaction success/failure with hash
+
+## Level 2 — Yellow Belt (in progress)
+
+- **StellarWalletsKit** — pick Freighter, Albedo, or xBull from a wallet modal
+- **Soroban contract** — `payment-log` records payments and emits events
+- **Real-time feed** — `activity` command + live event polling in chat
+- **Error handling** — wallet not found, user rejected, insufficient balance
+
+---
 
 ## Features
 
-- **Freighter wallet** connect and disconnect on Stellar testnet
+- **Multi-wallet connect** via StellarWalletsKit
 - **Live XLM balance** in the header after connecting
-- **Any-wallet balance lookup** — check any testnet address via chat
+- **Any-wallet balance lookup** — `balance G...`
+- **Friendbot funding** — `fund` or `fund G...`
 - **Chat-based payments** — send XLM with natural commands
-- **Friendbot funding** — type `fund` to get testnet XLM for new accounts
-- **Transaction feedback** — success/failure states with hash and Stellar Expert link
+- **On-chain activity log** — Soroban contract + event feed
+- **Transaction feedback** — pending / success / failure with explorer links
 
 ## Chat Commands
 
@@ -22,25 +40,25 @@ Instead of traditional forms, you connect your Freighter wallet and type command
 | `help` | Show all available commands |
 | `balance` | Display your current XLM balance |
 | `balance G...` | Check balance of any testnet wallet |
-| `check G...` | Alias for balance lookup |
-| `fund` | Request testnet XLM for your wallet |
-| `fund G...` | Request testnet XLM for any address |
-| `send 10 to G...` | Send XLM to a Stellar address |
+| `fund` | Friendbot funding for your wallet |
+| `fund G...` | Friendbot funding for any address |
+| `activity` | Recent payments from the Soroban contract |
+| `send 10 to G...` | Send XLM (also logged on-chain when contract is configured) |
 | `pay 5 G...` | Alias for send |
-| `transfer 2 XLM to G...` | Alias for send |
 
 ## Tech Stack
 
 - React 18 + TypeScript + Vite
 - Tailwind CSS
-- [@stellar/freighter-api](https://www.npmjs.com/package/@stellar/freighter-api) — wallet integration
-- [@stellar/stellar-sdk](https://www.npmjs.com/package/@stellar/stellar-sdk) — Horizon API & transactions
+- [@creit.tech/stellar-wallets-kit](https://www.npmjs.com/package/@creit.tech/stellar-wallets-kit) — multi-wallet
+- [@stellar/stellar-sdk](https://www.npmjs.com/package/@stellar/stellar-sdk) — Horizon + Soroban RPC
+- Rust Soroban contract — `contracts/payment-log`
 
 ## Prerequisites
 
 1. [Node.js](https://nodejs.org/) 18+
-2. [Freighter wallet](https://www.freighter.app) browser extension
-3. Freighter set to **Testnet** (Settings → Network → Testnet)
+2. A Stellar wallet (Freighter, Albedo, or xBull) on **Testnet**
+3. [Stellar CLI](https://developers.stellar.org/docs/tools/cli) — to deploy the contract
 
 ## Setup (Local)
 
@@ -48,19 +66,29 @@ Instead of traditional forms, you connect your Freighter wallet and type command
 git clone https://github.com/thestatisticia/stellarchatpay.git
 cd stellarchatpay
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+### Deploy the Soroban contract
+
+See [contracts/README.md](contracts/README.md). After deploy, set `VITE_CONTRACT_ID` in `.env.local` and Vercel.
 
 ## Usage
 
-1. Click **Connect Wallet** and approve in Freighter
-2. If your account is new, type `fund` in the chat to get testnet XLM
-3. Check your balance with `balance` (also shown in the header)
-4. Send a payment: `send 1 to GABCDEF...` (use a real testnet address)
-5. Approve the transaction in Freighter
-6. See the success message with transaction hash and explorer link
+1. Click **Connect Wallet** and choose Freighter, Albedo, or xBull
+2. Type `fund` if the account is new
+3. Send: `send 1 to GABCDEF...`
+4. Approve the XLM payment, then approve the contract `log_payment` call
+5. Type `activity` to see the on-chain payment feed
+
+## Error handling (Yellow Belt)
+
+| Error | User sees |
+|-------|-----------|
+| Wallet not found | "No Stellar wallet detected…" |
+| User rejected | "You rejected the request in your wallet…" |
+| Insufficient balance | "Insufficient XLM balance…" |
 
 ## Build for Production
 
@@ -73,11 +101,19 @@ npm run preview
 
 **Live app:** [https://stellarchatpay.vercel.app/](https://stellarchatpay.vercel.app/)
 
-This project includes a `vercel.json` for easy deployment:
-
 1. Push to GitHub
-2. Import the repo on [Vercel](https://vercel.com)
-3. Deploy (no environment variables needed for testnet)
+2. Import on [Vercel](https://vercel.com)
+3. Set `VITE_CONTRACT_ID` environment variable after deploying the contract
+
+## Contract (Yellow Belt)
+
+> Update after deployment:
+
+| Field | Value |
+|-------|-------|
+| **Contract ID** | `TBD — run npm run contract:deploy` |
+| **Contract call tx** | `TBD — after first payment + log_payment` |
+| **Network** | Stellar Testnet |
 
 ## Screenshots
 
@@ -87,33 +123,37 @@ This project includes a `vercel.json` for easy deployment:
 
 ### Balance check via chat
 
-Type `balance` to fetch and display your XLM on testnet.
-
 ![Balance check](screenshots/balance-check.png)
 
 ### Successful XLM payment
-
-Send command with processing state, confirmation card, transaction hash, and Stellar Expert link.
 
 ![Payment success](screenshots/payment-success.png)
 
 ### Error handling
 
-Unrecognized commands return clear feedback with suggested alternatives.
-
 ![Error handling](screenshots/error-handling.png)
 
-## Submission Checklist (White Belt)
+> **Yellow Belt:** add a screenshot of the multi-wallet picker modal.
 
-- [x] Freighter wallet on Stellar testnet
-- [x] Wallet connect functionality
-- [x] Wallet disconnect functionality
-- [x] Fetch and display XLM balance
-- [x] Send XLM transaction on testnet
-- [x] Show success/failure + transaction hash
-- [x] Public GitHub repository — [thestatisticia/stellarchatpay](https://github.com/thestatisticia/stellarchatpay)
-- [x] Live demo — [stellarchatpay.vercel.app](https://stellarchatpay.vercel.app/)
-- [x] README with setup instructions and screenshots
+## Submission Checklist
+
+### White Belt — complete
+
+- [x] Freighter + testnet, connect/disconnect, balance, send XLM, tx hash
+- [x] [GitHub repo](https://github.com/thestatisticia/stellarchatpay) + [live demo](https://stellarchatpay.vercel.app/)
+
+### Yellow Belt
+
+- [x] StellarWalletsKit multi-wallet
+- [x] 3 error types handled
+- [x] Soroban contract source (`contracts/payment-log`)
+- [x] Contract called from frontend after payments
+- [x] Real-time event polling + `activity` command
+- [x] Transaction status (pending / success / fail)
+- [ ] Contract deployed on testnet (set `VITE_CONTRACT_ID`)
+- [ ] Contract address + contract call tx hash in README
+- [ ] Screenshot: wallet options modal
+- [x] 2+ meaningful commits on same repo
 
 ## License
 

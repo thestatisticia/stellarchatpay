@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChatWindow } from "./components/ChatWindow";
 import { WalletHeader } from "./components/WalletHeader";
+import { usePaymentEvents } from "./hooks/usePaymentEvents";
 import { useTheme } from "./hooks/useTheme";
 import { useWallet } from "./hooks/useWallet";
+import { isContractConfigured } from "./config/contract";
 import {
   HELP_MESSAGE,
   WELCOME_MESSAGE,
@@ -13,11 +15,21 @@ import {
   type ChatMessage,
 } from "./lib/chat";
 import {
+  fetchRecentPaymentEvents,
+  getContractPaymentCount,
+  logPaymentOnContract,
+} from "./lib/contract";
+import {
+  assertSufficientBalance,
+  formatWalletError,
+} from "./lib/errors";
+import {
   fetchAccountBalance,
+  fetchXlmBalance,
   fundTestnetAccount,
+  getAccountExplorerUrl,
   isValidStellarAddress,
   sendXlmPayment,
-  getAccountExplorerUrl,
 } from "./lib/stellar";
 
 function App() {
@@ -31,6 +43,25 @@ function App() {
     setMessages((prev) => [...prev, createMessage(message)]);
   }, []);
 
+  const handleLiveEvent = useCallback(
+    (event: { from: string; to: string; amount: string; txHash: string }) => {
+      if (event.from !== wallet.address && event.to !== wallet.address) return;
+
+      addMessage({
+        role: "bot",
+        content: `**Live feed** — \`${event.from.slice(0, 6)}…\` sent **${event.amount} XLM** → \`${event.to.slice(0, 6)}…\``,
+        status: "info",
+        txHash: event.txHash,
+        explorerUrl: `https://stellar.expert/explorer/testnet/tx/${event.txHash}`,
+        amount: event.amount,
+        destination: event.to,
+      });
+    },
+    [addMessage, wallet.address]
+  );
+
+  usePaymentEvents(wallet.isConnected, handleLiveEvent);
+
   useEffect(() => {
     addMessage({
       role: "bot",
@@ -41,29 +72,28 @@ function App() {
 
   const handleConnect = async () => {
     try {
-      const address = await wallet.connect();
-      addMessage({ role: "system", content: "Wallet connected" });
+      const { address, walletName } = await wallet.connect();
+      addMessage({ role: "system", content: `Connected via ${walletName}` });
       addMessage({
         role: "bot",
-        content: `You're live on testnet as \`${address.slice(0, 8)}…${address.slice(-6)}\`.\n\nNew account? Type \`fund\` first. Then try \`balance\` or send a payment.`,
+        content: `You're live on testnet as \`${address.slice(0, 8)}…${address.slice(-6)}\` via **${walletName}**.\n\nNew account? Type \`fund\`. Try \`activity\` for the on-chain feed.`,
         status: "success",
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Connection failed";
       addMessage({
         role: "bot",
-        content: `Couldn't connect: ${message}`,
+        content: formatWalletError(error),
         status: "error",
       });
     }
   };
 
-  const handleDisconnect = () => {
-    wallet.disconnect();
+  const handleDisconnect = async () => {
+    await wallet.disconnect();
     addMessage({ role: "system", content: "Wallet disconnected" });
     addMessage({
       role: "bot",
-      content: "Disconnected. Hit **Connect** when you're ready to chat again.",
+      content: "Disconnected. Connect again to pick Freighter, Albedo, or xBull.",
       status: "info",
     });
   };
@@ -73,6 +103,50 @@ function App() {
 
     if (command === "help") {
       addMessage({ role: "bot", content: HELP_MESSAGE, status: "info" });
+      return;
+    }
+
+    if (command === "activity") {
+      if (!isContractConfigured()) {
+        addMessage({
+          role: "bot",
+          content: "Contract not deployed yet. Set `VITE_CONTRACT_ID` after deploying the payment-log contract.",
+          status: "error",
+        });
+        return;
+      }
+
+      addMessage({ role: "bot", content: "Fetching on-chain activity…", status: "pending" });
+      try {
+        const count = await getContractPaymentCount();
+        const { events } = await fetchRecentPaymentEvents();
+
+        if (events.length === 0) {
+          addMessage({
+            role: "bot",
+            content: `No payments logged yet.${count !== null ? ` Total on contract: **${count}**.` : ""}\n\nSend XLM with \`send 10 to G...\` to create activity.`,
+            status: "info",
+          });
+          return;
+        }
+
+        const lines = events.slice(0, 5).map(
+          (e) =>
+            `• \`${e.from.slice(0, 6)}…\` → \`${e.to.slice(0, 6)}…\` · **${e.amount} XLM**`
+        );
+
+        addMessage({
+          role: "bot",
+          content: `**Recent activity** (${events.length} event${events.length === 1 ? "" : "s"})\n\n${lines.join("\n")}${count !== null ? `\n\nTotal logged: **${count}**` : ""}`,
+          status: "success",
+        });
+      } catch (error) {
+        addMessage({
+          role: "bot",
+          content: formatWalletError(error),
+          status: "error",
+        });
+      }
       return;
     }
 
@@ -86,10 +160,9 @@ function App() {
           status: "success",
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Balance fetch failed";
         addMessage({
           role: "bot",
-          content: `Couldn't fetch balance: ${message}`,
+          content: formatWalletError(error),
           status: "error",
         });
       }
@@ -130,10 +203,9 @@ function App() {
           explorerUrl: getAccountExplorerUrl(otherAddress),
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Balance fetch failed";
         addMessage({
           role: "bot",
-          content: `Couldn't fetch balance: ${message}`,
+          content: formatWalletError(error),
           status: "error",
         });
       }
@@ -176,10 +248,9 @@ function App() {
           explorerUrl: getAccountExplorerUrl(fundAddress),
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Funding failed";
         addMessage({
           role: "bot",
-          content: message,
+          content: formatWalletError(error),
           status: "error",
         });
       }
@@ -206,10 +277,9 @@ function App() {
           status: result.status === "already_funded" ? "info" : "success",
         });
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Funding failed";
         addMessage({
           role: "bot",
-          content: message,
+          content: formatWalletError(error),
           status: "error",
         });
       }
@@ -248,9 +318,24 @@ function App() {
         return;
       }
 
+      try {
+        await assertSufficientBalance(
+          wallet.address,
+          payment.amount,
+          fetchXlmBalance
+        );
+      } catch (error) {
+        addMessage({
+          role: "bot",
+          content: formatWalletError(error),
+          status: "error",
+        });
+        return;
+      }
+
       addMessage({
         role: "bot",
-        content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 8)}…${payment.destination.slice(-6)}\`\n\nFreighter will ask you to approve this site and the transaction.`,
+        content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 8)}…${payment.destination.slice(-6)}\`\n\nApprove in your wallet when prompted.`,
         status: "pending",
       });
 
@@ -258,26 +343,57 @@ function App() {
         const result = await sendXlmPayment(
           wallet.address,
           payment.destination,
-          payment.amount
+          payment.amount,
+          wallet.signTransaction
         );
 
         await wallet.refreshBalance(wallet.address);
 
         addMessage({
           role: "bot",
-          content: "Payment went through.",
+          content: "Payment went through on Stellar.",
           status: "success",
           txHash: result.hash,
           explorerUrl: result.explorerUrl,
           amount: payment.amount,
           destination: payment.destination,
         });
+
+        if (isContractConfigured()) {
+          addMessage({
+            role: "bot",
+            content: "Logging payment to Soroban contract…",
+            status: "pending",
+          });
+
+          try {
+            const contractTx = await logPaymentOnContract(
+              wallet.address,
+              payment.destination,
+              payment.amount,
+              result.hash,
+              wallet.signTransaction
+            );
+
+            addMessage({
+              role: "bot",
+              content: "Payment logged on-chain. Activity feed updated.",
+              status: "success",
+              txHash: contractTx.hash,
+              explorerUrl: contractTx.explorerUrl,
+            });
+          } catch (error) {
+            addMessage({
+              role: "bot",
+              content: `Payment sent, but contract log failed: ${formatWalletError(error)}`,
+              status: "error",
+            });
+          }
+        }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Transaction failed";
         addMessage({
           role: "bot",
-          content: `Transaction failed: ${message}`,
+          content: formatWalletError(error),
           status: "error",
         });
       }
@@ -286,8 +402,7 @@ function App() {
 
     addMessage({
       role: "bot",
-      content:
-        "Didn't catch that. Try `help`, or:\n`send 10 to G...`",
+      content: "Didn't catch that. Try `help`, or:\n`send 10 to G...`",
       status: "error",
     });
   };
@@ -321,6 +436,7 @@ function App() {
     <div className="app-shell">
       <WalletHeader
         address={wallet.address}
+        walletName={wallet.walletName}
         balance={wallet.balance}
         isConnecting={wallet.isConnecting}
         isLoadingBalance={wallet.isLoadingBalance}

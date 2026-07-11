@@ -91,9 +91,10 @@ Tap a quick action below or type a command:
 • \`balance G...\` — check any wallet's balance
 • \`fund\` — fund your wallet via Friendbot
 • \`fund G...\` — fund any testnet wallet
-• \`send 10 to G...\` — pay someone
+• \`activity\` — live payment feed from the Soroban contract
+• \`send 10 to G...\` — pay someone (logged on-chain)
 
-Payments open in Freighter for you to approve.`;
+Connect via **Freighter, Albedo, or xBull** using the wallet picker.`;
 
 export const HELP_MESSAGE = `**Commands**
 
@@ -102,7 +103,8 @@ export const HELP_MESSAGE = `**Commands**
 \`check G...\` — alias for balance lookup
 \`fund\` — Friendbot funding for your wallet
 \`fund G...\` — Friendbot funding for any address
-\`send <amount> to <address>\` — send a payment
+\`activity\` — recent payments from the on-chain activity feed
+\`send <amount> to <address>\` — send a payment (also logged to contract)
 
 **Also works:**
 • \`pay 5 G...\`

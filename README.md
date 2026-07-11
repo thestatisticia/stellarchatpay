@@ -42,8 +42,8 @@ Instead of traditional forms, you connect your Freighter wallet and type command
 ## Setup (Local)
 
 ```bash
-git clone <your-repo-url>
-cd risein
+git clone https://github.com/thestatisticia/stellarchatpay.git
+cd stellarchatpay
 npm install
 npm run dev
 ```
@@ -76,14 +76,19 @@ This project includes a `vercel.json` for easy deployment:
 
 ## Screenshots
 
-> Add screenshots here after testing locally:
+### Wallet connected + balance displayed
 
-1. **Wallet connected** — header shows address and balance
-2. **Balance displayed** — `balance` command response in chat
-3. **Successful transaction** — success message with tx hash
-4. **Transaction result** — Stellar Expert explorer link
+Header shows the connected address and live XLM balance. Chat confirms successful Freighter connection on testnet.
 
-Suggested filenames: `screenshots/connected.png`, `screenshots/balance.png`, `screenshots/transaction.png`
+![Wallet connected with balance](screenshots/wallet-connected.png)
+
+### Error handling
+
+Unrecognized commands return clear feedback with suggested alternatives.
+
+![Error handling](screenshots/error-handling.png)
+
+> **Tip:** For a stronger submission, also add screenshots of a successful `send` transaction with the tx hash and Stellar Expert link.
 
 ## Submission Checklist (White Belt)
 
@@ -93,9 +98,10 @@ Suggested filenames: `screenshots/connected.png`, `screenshots/balance.png`, `sc
 - [x] Fetch and display XLM balance
 - [x] Send XLM transaction on testnet
 - [x] Show success/failure + transaction hash
-- [ ] Public GitHub repository
+- [x] Public GitHub repository
+- [x] README screenshots (connection + error handling)
 - [ ] Deployed live URL
-- [ ] README screenshots
+- [ ] Screenshot: successful testnet transaction with tx hash
 
 ## License
 

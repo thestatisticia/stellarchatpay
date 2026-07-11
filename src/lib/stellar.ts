@@ -131,12 +131,53 @@ export async function fetchXlmBalance(publicKey: string): Promise<string> {
   return balance;
 }
 
-export async function fundTestnetAccount(publicKey: string): Promise<void> {
-  const response = await fetch(`${FRIENDBOT_URL}?addr=${encodeURIComponent(publicKey)}`);
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || "Friendbot funding failed");
+export async function fundTestnetAccount(publicKey: string): Promise<{
+  status: "funded" | "already_funded";
+  message: string;
+}> {
+  const response = await fetch(
+    `${FRIENDBOT_URL}?addr=${encodeURIComponent(publicKey)}`
+  );
+
+  if (response.ok) {
+    return {
+      status: "funded",
+      message: "Account funded with testnet XLM from Friendbot.",
+    };
   }
+
+  let detail = "";
+  try {
+    const data = (await response.json()) as { detail?: string; title?: string };
+    detail = data.detail ?? data.title ?? "";
+  } catch {
+    detail = await response.text();
+  }
+
+  const normalized = detail.toLowerCase();
+
+  if (
+    normalized.includes("already funded") ||
+    normalized.includes("starting balance")
+  ) {
+    return {
+      status: "already_funded",
+      message:
+        "This account already has testnet XLM. Friendbot only funds new accounts once.",
+    };
+  }
+
+  if (response.status === 400) {
+    throw new Error(
+      detail || "Friendbot rejected the request. Check the Stellar address."
+    );
+  }
+
+  if (response.status >= 500) {
+    throw new Error("Friendbot is temporarily unavailable. Try again in a moment.");
+  }
+
+  throw new Error(detail || "Friendbot funding failed");
 }
 
 export interface SendPaymentResult {

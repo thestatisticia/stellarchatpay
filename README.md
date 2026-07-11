@@ -23,7 +23,8 @@ Instead of traditional forms, you connect your Freighter wallet and type command
 | `balance` | Display your current XLM balance |
 | `balance G...` | Check balance of any testnet wallet |
 | `check G...` | Alias for balance lookup |
-| `fund` | Request free testnet XLM from Friendbot |
+| `fund` | Request testnet XLM for your wallet |
+| `fund G...` | Request testnet XLM for any address |
 | `send 10 to G...` | Send XLM to a Stellar address |
 | `pay 5 G...` | Alias for send |
 | `transfer 2 XLM to G...` | Alias for send |

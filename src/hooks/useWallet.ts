@@ -12,7 +12,6 @@ interface WalletState {
   isLoadingBalance: boolean;
   error: string | null;
 }
-
 export function useWallet() {
   const [state, setState] = useState<WalletState>({
     address: null,
@@ -85,10 +84,10 @@ export function useWallet() {
     if (!state.address) {
       throw new Error("Connect your wallet first");
     }
-    await fundTestnetAccount(state.address);
+    const result = await fundTestnetAccount(state.address);
     await refreshBalance(state.address);
+    return result;
   }, [state.address, refreshBalance]);
-
   return {
     ...state,
     isConnected: Boolean(state.address),

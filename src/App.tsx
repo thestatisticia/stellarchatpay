@@ -8,11 +8,13 @@ import {
   WELCOME_MESSAGE,
   createMessage,
   parseBalanceCommand,
+  parseFundCommand,
   parseSendCommand,
   type ChatMessage,
 } from "./lib/chat";
 import {
   fetchAccountBalance,
+  fundTestnetAccount,
   isValidStellarAddress,
   sendXlmPayment,
   getAccountExplorerUrl,
@@ -138,26 +140,76 @@ function App() {
       return;
     }
 
-    if (command === "fund") {
-      if (!wallet.address) return;
-      addMessage({
-        role: "bot",
-        content: "Hitting Friendbot for testnet XLM…",
-        status: "pending",
-      });
-      try {
-        await wallet.fundAccount();
-        const balance = await wallet.refreshBalance(wallet.address);
+    const fundAddress = parseFundCommand(rawInput);
+    if (fundAddress) {
+      if (!isValidStellarAddress(fundAddress)) {
         addMessage({
           role: "bot",
-          content: `Funded. Balance is now **${balance} XLM**.`,
-          status: "success",
+          content: "That doesn't look like a valid Stellar address (starts with `G`, 56 chars).",
+          status: "error",
+        });
+        return;
+      }
+
+      const short = `${fundAddress.slice(0, 8)}…${fundAddress.slice(-6)}`;
+      addMessage({
+        role: "bot",
+        content: `Requesting Friendbot funding for \`${short}\`…`,
+        status: "pending",
+      });
+
+      try {
+        const result = await fundTestnetAccount(fundAddress);
+        const { balance } = await fetchAccountBalance(fundAddress);
+
+        if (wallet.address === fundAddress) {
+          await wallet.refreshBalance(fundAddress);
+        }
+
+        addMessage({
+          role: "bot",
+          content:
+            result.status === "already_funded"
+              ? `${result.message}\n\nCurrent balance: **${balance} XLM**.`
+              : `${result.message}\n\nBalance for \`${short}\` is now **${balance} XLM**.`,
+          status: result.status === "already_funded" ? "info" : "success",
+          explorerUrl: getAccountExplorerUrl(fundAddress),
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Funding failed";
         addMessage({
           role: "bot",
-          content: `Funding failed: ${message}`,
+          content: message,
+          status: "error",
+        });
+      }
+      return;
+    }
+
+    if (command === "fund") {
+      if (!wallet.address) return;
+      addMessage({
+        role: "bot",
+        content: "Requesting Friendbot funding for your wallet…",
+        status: "pending",
+      });
+      try {
+        const result = await wallet.fundAccount();
+        const balance = wallet.balance ?? (await wallet.refreshBalance(wallet.address));
+
+        addMessage({
+          role: "bot",
+          content:
+            result.status === "already_funded"
+              ? `${result.message}\n\nYour balance is **${balance} XLM**.`
+              : `${result.message}\n\nYour balance is now **${balance} XLM**.`,
+          status: result.status === "already_funded" ? "info" : "success",
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Funding failed";
+        addMessage({
+          role: "bot",
+          content: message,
           status: "error",
         });
       }

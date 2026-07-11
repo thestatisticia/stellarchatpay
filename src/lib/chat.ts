@@ -37,6 +37,20 @@ const BALANCE_PATTERNS = [
   /^lookup\s+(G[A-Z2-7]{55})$/i,
 ];
 
+const FUND_PATTERNS = [
+  /^fund\s+(?:wallet\s+)?(G[A-Z2-7]{55})$/i,
+  /^fund\s+(?:account\s+)?(G[A-Z2-7]{55})$/i,
+];
+
+export function parseFundCommand(input: string): string | null {
+  const trimmed = input.trim();
+  for (const pattern of FUND_PATTERNS) {
+    const match = trimmed.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
 export function parseBalanceCommand(input: string): string | null {
   const trimmed = input.trim();
   for (const pattern of BALANCE_PATTERNS) {
@@ -75,7 +89,8 @@ Tap a quick action below or type a command:
 
 • \`balance\` — check your XLM
 • \`balance G...\` — check any wallet's balance
-• \`fund\` — get free testnet XLM
+• \`fund\` — fund your wallet via Friendbot
+• \`fund G...\` — fund any testnet wallet
 • \`send 10 to G...\` — pay someone
 
 Payments open in Freighter for you to approve.`;
@@ -85,7 +100,8 @@ export const HELP_MESSAGE = `**Commands**
 \`balance\` — your XLM balance
 \`balance G...\` — balance of any testnet address
 \`check G...\` — alias for balance lookup
-\`fund\` — Friendbot testnet funding
+\`fund\` — Friendbot funding for your wallet
+\`fund G...\` — Friendbot funding for any address
 \`send <amount> to <address>\` — send a payment
 
 **Also works:**

@@ -45,7 +45,7 @@ export function ChatWindow({
   };
 
   return (
-    <div className="relative mx-auto flex h-[calc(100dvh-65px)] max-w-3xl flex-col px-4 py-4">
+    <div className="relative mx-auto flex h-[calc(100dvh-56px)] max-w-3xl flex-col px-4 py-4">
       {!isConnected && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-4">
           <div className="connect-card pointer-events-auto w-full max-w-md animate-fade-up rounded-xl p-8">

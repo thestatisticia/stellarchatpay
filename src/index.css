@@ -137,7 +137,9 @@
 
   .theme-segment {
     display: inline-flex;
-    padding: 3px;
+    align-items: center;
+    height: 32px;
+    padding: 2px;
     border-radius: 8px;
     background: var(--segment-bg);
     border: 1px solid var(--border);
@@ -146,11 +148,14 @@
   .theme-segment-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    padding: 6px 10px;
+    height: 26px;
+    padding: 0 10px;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 500;
+    line-height: 1;
     color: var(--text-muted);
     transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   }
@@ -170,9 +175,71 @@
     box-shadow: var(--shadow);
   }
 
-  .wallet-pill {
+  .network-badge {
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .network-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+  }
+
+  .wallet-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 8px;
     background: var(--surface);
     border: 1px solid var(--border);
+  }
+
+  .wallet-chip-address {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .wallet-chip-divider {
+    width: 1px;
+    height: 14px;
+    background: var(--border);
+  }
+
+  .wallet-chip-balance {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .wallet-chip-unit {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .wallet-chip-skeleton {
+    display: inline-block;
+    width: 52px;
+    height: 12px;
+    border-radius: 4px;
+    background: var(--surface-3);
+    animation: pulseSoft 1.2s ease-in-out infinite;
   }
 
   .btn-primary {

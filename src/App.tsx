@@ -83,11 +83,13 @@ function App() {
 
   const handleConnect = async () => {
     try {
-      const { address, walletName } = await wallet.connect();
+      const { address, walletName, accountExists } = await wallet.connect();
       addMessage({ role: "system", content: `Connected via ${walletName}` });
       addMessage({
         role: "bot",
-        content: `Connected via **${walletName}** as \`${address.slice(0, 8)}…${address.slice(-6)}\`.\n\nType \`fund\` if this is a new testnet account, or \`balance\` to check your XLM.`,
+        content: accountExists
+          ? `You're live on testnet as \`${address.slice(0, 8)}…${address.slice(-6)}\`.\n\nTry \`balance\`, \`send 10 to G...\`, or \`swap 10 xlm to usdc\`.`
+          : `Connected as \`${address.slice(0, 8)}…${address.slice(-6)}\`.\n\nThis account is not funded on testnet yet — type \`fund\` to get XLM from Friendbot.`,
         status: "success",
       });
     } catch (error) {
@@ -622,7 +624,6 @@ function App() {
     <div className="app-shell">
       <WalletHeader
         address={wallet.address}
-        walletName={wallet.walletName}
         balance={wallet.balance}
         isConnecting={wallet.isConnecting}
         isLoadingBalance={wallet.isLoadingBalance}

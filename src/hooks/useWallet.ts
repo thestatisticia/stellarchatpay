@@ -63,12 +63,13 @@ export function useWallet() {
         walletName,
         isConnecting: false,
         balance: null,
-        isLoadingBalance: false,
+        isLoadingBalance: true,
       }));
 
-      return { address, walletName, accountExists: null as boolean | null };
+      const { exists } = await refreshBalance(address);
+      return { address, walletName, accountExists: exists };
     } catch (error) {
-      setState((prev) => ({ ...prev, isConnecting: false }));
+      setState((prev) => ({ ...prev, isConnecting: false, isLoadingBalance: false }));
       classifyAndThrow(error);
     }
   }, [refreshBalance]);

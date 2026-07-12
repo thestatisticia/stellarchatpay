@@ -14,7 +14,7 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 - Balance display + send XLM
 - Transaction success/failure with hash
 
-## Level 2 — Yellow Belt (in progress)
+## Level 2 — Yellow Belt (complete)
 
 - **StellarWalletsKit** — pick Freighter, Albedo, or xBull from a wallet modal
 - **Soroban contract** — `payment-log` records payments and emits events
@@ -138,7 +138,9 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 
 ![Error handling](screenshots/error-handling.png)
 
-> **Yellow Belt:** add a screenshot of the multi-wallet picker modal.
+### Multi-wallet picker modal
+
+![Wallet options modal](screenshots/wallet-options-modal.png)
 
 ## Submission Checklist
 
@@ -155,9 +157,9 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 - [x] Contract called from frontend after payments
 - [x] Real-time event polling + `activity` command
 - [x] Transaction status (pending / success / fail)
-- [ ] Contract deployed on testnet (set `VITE_CONTRACT_ID`)
+- [x] Contract deployed on testnet (`VITE_CONTRACT_ID` set)
 - [x] Contract address + deploy tx hash in README
-- [ ] Screenshot: wallet options modal
+- [x] Screenshot: wallet options modal
 - [x] 2+ meaningful commits on same repo
 
 ## License

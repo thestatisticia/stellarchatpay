@@ -1,20 +1,21 @@
-export function BotAvatar() {
+interface BotAvatarProps {
+  size?: "sm" | "md";
+}
+
+export function BotAvatar({ size = "md" }: BotAvatarProps) {
+  const dim = size === "sm" ? "h-7 w-7" : "h-9 w-9";
+  const icon = size === "sm" ? "h-4 w-4" : "h-[18px] w-[18px]";
+
   return (
-    <div className="bot-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-full" aria-hidden>
-      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+    <div
+      className={`bot-avatar flex ${dim} shrink-0 items-center justify-center rounded-full`}
+      aria-hidden
+    >
+      <svg viewBox="0 0 24 24" className={icon} fill="none">
+        <circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.12" />
         <path
-          d="M8 10.5c0-1.1.9-2 2-2h4c1.1 0 2 .9 2 2v.75c0 .55-.25 1.07-.68 1.42l-1.32 1.1a1.5 1.5 0 00-.5 1.12V15"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-        <circle cx="12" cy="17" r="1" fill="currentColor" />
-        <path
-          d="M12 3v1.5M12 19.5V21M3 12h1.5M19.5 12H21"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
+          d="M12 3.5l2.2 6.8h7.1l-5.7 4.2 2.2 6.8L12 17l-5.8 4.3 2.2-6.8-5.7-4.2h7.1L12 3.5z"
+          fill="currentColor"
         />
       </svg>
     </div>

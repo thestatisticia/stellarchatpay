@@ -620,6 +620,16 @@ function App() {
     await runCommand(command);
   };
 
+  const handleClearChat = () => {
+    pendingSwap.current = null;
+    setMessages([]);
+    addMessage({
+      role: "bot",
+      content: WELCOME_MESSAGE,
+      status: "info",
+    });
+  };
+
   return (
     <div className="app-shell flex min-h-dvh flex-col">
       <WalletHeader
@@ -632,6 +642,7 @@ function App() {
         onSetTheme={setTheme}
         onConnect={handleConnect}
         onDisconnect={handleDisconnect}
+        onClearChat={handleClearChat}
       />
 
       <ChatWindow

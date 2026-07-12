@@ -1,6 +1,6 @@
-import { truncateAddress } from "../lib/stellar";
-import { Logo } from "./Logo";
+import { BotAvatar } from "./BotAvatar";
 import { ThemeToggle } from "./ThemeToggle";
+import { truncateAddress } from "../lib/stellar";
 
 interface WalletHeaderProps {
   address: string | null;
@@ -12,6 +12,7 @@ interface WalletHeaderProps {
   onSetTheme: (theme: "light" | "dark") => void;
   onConnect: () => void;
   onDisconnect: () => void;
+  onClearChat: () => void;
 }
 
 function formatBalance(balance: string | null): string {
@@ -20,7 +21,7 @@ function formatBalance(balance: string | null): string {
   if (Number.isNaN(value)) return balance;
   return value.toLocaleString(undefined, {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 4,
+    maximumFractionDigits: 2,
   });
 }
 
@@ -38,6 +39,18 @@ function WalletIcon() {
   );
 }
 
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4 4v5h5M20 20v-5h-5M20 9A8 8 0 006.34 6.34M4 15a8 8 0 0013.66 2.66"
+      />
+    </svg>
+  );
+}
+
 export function WalletHeader({
   address,
   balance,
@@ -48,16 +61,49 @@ export function WalletHeader({
   onSetTheme,
   onConnect,
   onDisconnect,
+  onClearChat,
 }: WalletHeaderProps) {
   return (
     <header className="app-header sticky top-0 z-20">
       <div className="header-inner">
-        <Logo />
+        <div className="header-left">
+          <div className="agent-pill">
+            <BotAvatar size="sm" />
+            <span className="agent-pill-name">StellarChat Pay</span>
+            <svg
+              className="agent-pill-chevron"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+            </svg>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClearChat}
+            className="header-icon-btn"
+            aria-label="Clear chat"
+            title="Clear chat"
+          >
+            <RefreshIcon />
+          </button>
+        </div>
 
         <div className="header-actions">
           {isConnected && address && (
-            <div className="header-wallet-pill hidden sm:inline-flex">
-              <span className="header-wallet-dot" aria-hidden />
+            <button
+              type="button"
+              onClick={onDisconnect}
+              className="header-wallet-pill hidden sm:inline-flex"
+              title="Click to disconnect"
+            >
+              <span className="header-wallet-icon">
+                <WalletIcon />
+              </span>
               <span className="header-wallet-address font-mono">
                 {truncateAddress(address, 5)}
               </span>
@@ -68,20 +114,10 @@ export function WalletHeader({
                   `${formatBalance(balance)} XLM`
                 )}
               </span>
-            </div>
+            </button>
           )}
 
           <ThemeToggle theme={theme} onSetTheme={onSetTheme} />
-
-          {isConnected ? (
-            <button
-              type="button"
-              onClick={onDisconnect}
-              className="header-ghost-btn hidden sm:inline-flex"
-            >
-              Disconnect
-            </button>
-          ) : null}
 
           {!isConnected && (
             <button
@@ -99,17 +135,16 @@ export function WalletHeader({
 
       {isConnected && address && (
         <div className="header-mobile-bar sm:hidden">
-          <div className="header-wallet-pill">
-            <span className="header-wallet-dot" aria-hidden />
+          <button type="button" onClick={onDisconnect} className="header-wallet-pill">
+            <span className="header-wallet-icon">
+              <WalletIcon />
+            </span>
             <span className="header-wallet-address font-mono text-xs">
               {truncateAddress(address, 5)}
             </span>
             <span className="header-wallet-balance text-sm tabular-nums">
               {isLoadingBalance ? "…" : `${formatBalance(balance)} XLM`}
             </span>
-          </div>
-          <button type="button" onClick={onDisconnect} className="header-ghost-btn text-xs">
-            Disconnect
           </button>
         </div>
       )}

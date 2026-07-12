@@ -621,7 +621,7 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell flex min-h-dvh flex-col">
       <WalletHeader
         address={wallet.address}
         balance={wallet.balance}
@@ -635,6 +635,7 @@ function App() {
       />
 
       <ChatWindow
+        className="min-h-0 flex-1"
         messages={messages}
         isProcessing={isProcessing}
         isConnected={wallet.isConnected}

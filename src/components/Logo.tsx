@@ -1,18 +1,11 @@
 interface LogoProps {
-  size?: "sm" | "md";
   showText?: boolean;
 }
 
-export function Logo({ size = "md", showText = true }: LogoProps) {
-  const box = size === "sm" ? "h-8 w-8 rounded-lg" : "h-9 w-9 rounded-lg";
-  const text = size === "sm" ? "text-sm" : "text-base";
-
+export function Logo({ showText = true }: LogoProps) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div
-        className={`logo-mark ${box} flex shrink-0 items-center justify-center`}
-        aria-hidden
-      >
+    <div className="flex items-center gap-3">
+      <div className="logo-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" aria-hidden>
         <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
           <path
             d="M4 6h16M4 12h10M4 18h14"
@@ -24,14 +17,12 @@ export function Logo({ size = "md", showText = true }: LogoProps) {
         </svg>
       </div>
       {showText && (
-        <div className="min-w-0">
-          <p className={`${text} font-semibold tracking-tight`} style={{ color: "var(--text)" }}>
+        <div className="min-w-0 leading-none">
+          <p className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--text)" }}>
             StellarChat
-            <span className="font-normal" style={{ color: "var(--text-muted)" }}>
-              {" "}
-              Pay
-            </span>
+            <span style={{ color: "var(--brand-accent)" }}>Pay</span>
           </p>
+          <p className="logo-tagline mt-1">Testnet payments</p>
         </div>
       )}
     </div>

@@ -58,6 +58,22 @@ function parseRawMessage(message: string): string {
     return "Insufficient XLM balance to complete this transaction (include ~0.00001 XLM for fees).";
   }
 
+  if (
+    lower.includes("op_no_destination") ||
+    lower.includes("no_destination") ||
+    lower.includes("destination account does not exist")
+  ) {
+    return "Recipient not found on testnet. Check the full 56-character address — wrong or incomplete keys won't work.";
+  }
+
+  if (
+    lower.includes("invalid field") ||
+    lower.includes("malformed") ||
+    lower.includes("invalid account id")
+  ) {
+    return "Invalid Stellar address. Public keys are 56 characters and start with `G` — copy the full address from your wallet.";
+  }
+
   return message;
 }
 

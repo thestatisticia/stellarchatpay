@@ -110,6 +110,56 @@ export function parseSendCommand(input: string): ParsedSendCommand | null {
   return null;
 }
 
+const SEND_LIKE_PREFIX =
+  /^(?:send|pay|transfer|\d+(?:\.\d+)?\s*xlm)\b/i;
+
+const SWAP_LIKE_PREFIX = /^(?:swap|exchange)\s+/i;
+
+function extractAddressCandidate(input: string): string | null {
+  const match = input.match(/\b(G[A-Z2-7]+)/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+/** Helpful message when input looks like a send command but does not parse. */
+export function explainSendCommandFailure(input: string): string | null {
+  const trimmed = input.trim();
+  if (!SEND_LIKE_PREFIX.test(trimmed)) return null;
+  if (parseSendCommand(trimmed)) return null;
+
+  const address = extractAddressCandidate(trimmed);
+
+  if (!address) {
+    return "Missing recipient address.\n\nUse a full Stellar public key (56 characters, starts with `G`):\n`send 10 to GABCDEF...`\n`send 10 xlm to GABCDEF...`";
+  }
+
+  if (trimmed.includes("...") || trimmed.endsWith("..")) {
+    return "Address looks truncated — don't use `...`. Paste the **full** 56-character Stellar address from your wallet.";
+  }
+
+  if (address.length < 56) {
+    return `Address is incomplete (**${address.length}/56** characters).\n\nStellar public keys must be copied in full. Example:\n\`send 10 to GABCDEFGHIJKLMNOPQRSTUVWXYZ234567890123456789012345\``;
+  }
+
+  if (address.length > 56) {
+    return "Address is too long. A Stellar public key is exactly **56 characters** (including the leading `G`).";
+  }
+
+  if (!/^G[A-Z2-7]{55}$/.test(address)) {
+    return "Invalid address characters. After `G`, use only **A–Z** and **2–7** (Stellar base32).";
+  }
+
+  return "Couldn't parse that send command.\n\nTry:\n`send 10 to G...`\n`send 10 xlm to G...`\n\nBoth need the full recipient address.";
+}
+
+/** Helpful message when input looks like a swap command but does not parse. */
+export function explainSwapCommandFailure(input: string): string | null {
+  const trimmed = input.trim();
+  if (!SWAP_LIKE_PREFIX.test(trimmed)) return null;
+  if (parseSwapCommand(trimmed)) return null;
+
+  return "Couldn't parse that swap.\n\nUse:\n`swap 10 xlm to usdc`\n`swap 1 usdc to xlm`";
+}
+
 export function createMessage(
   partial: Omit<ChatMessage, "id" | "timestamp">
 ): ChatMessage {

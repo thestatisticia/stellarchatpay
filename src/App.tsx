@@ -9,6 +9,8 @@ import {
   HELP_MESSAGE,
   WELCOME_MESSAGE,
   createMessage,
+  explainSendCommandFailure,
+  explainSwapCommandFailure,
   parseBalanceCommand,
   parseConfirmCommand,
   parseFundCommand,
@@ -588,10 +590,22 @@ function App() {
       return;
     }
 
+    const sendHint = explainSendCommandFailure(rawInput);
+    if (sendHint) {
+      addMessage({ role: "bot", content: sendHint, status: "error" });
+      return;
+    }
+
+    const swapHint = explainSwapCommandFailure(rawInput);
+    if (swapHint) {
+      addMessage({ role: "bot", content: swapHint, status: "error" });
+      return;
+    }
+
     addMessage({
       role: "bot",
-      content: "Didn't catch that. Try `help`, or:\n`send 10 to G...`\n`swap 10 xlm to usdc`",
-      status: "error",
+      content: "Didn't catch that. Type `help` for all commands, or try:\n`send 10 to G...`\n`swap 10 xlm to usdc`",
+      status: "info",
     });
   };
 

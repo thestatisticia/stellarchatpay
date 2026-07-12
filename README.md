@@ -89,11 +89,36 @@ See [contracts/README.md](contracts/README.md). After deploy, set `VITE_CONTRACT
 
 ## Error handling (Yellow Belt)
 
-| Error | User sees |
-|-------|-----------|
-| Wallet not found | "No Stellar wallet detected…" |
-| User rejected | "You rejected the request in your wallet…" |
-| Insufficient balance | "Insufficient XLM balance…" |
+The app catches common failures and shows a clear message in chat (with a **Failed** badge when appropriate).
+
+| Error | Trigger | User sees |
+|-------|---------|-----------|
+| Wallet not found | No extension / wallet unavailable | "No Stellar wallet detected. Install Freighter, xBull, or Albedo…" |
+| User rejected | Declined sign in wallet modal | "You rejected the request in your wallet. Nothing was sent." |
+| Insufficient balance | Send or swap amount exceeds balance | "Insufficient XLM balance. You have **19,990.99 XLM** but need at least **100,000.00 XLM**." (shows actual vs required amounts) |
+| Invalid / truncated address | `send` with wrong, incomplete, or `...` address | "Address is incomplete (42/56 characters)…" or "Address looks truncated — don't use `...`" |
+| Bad send syntax | `send 100 xlm to G…` with malformed key | Specific guidance to paste the full 56-character `G` address |
+| Unknown command | Unrecognized input | Info message pointing to `help` (not marked as Failed) |
+
+### Insufficient balance (swap example)
+
+Before submitting a swap, the app checks your balance:
+
+```
+User: swap 100000 xlm to usdc
+Bot:  Insufficient XLM balance. You have 19990.9898747 XLM but need at least 100000.00001 XLM.
+```
+
+No wallet popup — the check runs first so you don't waste a rejected transaction.
+
+### Invalid recipient address (send example)
+
+If the address is truncated or wrong, the app explains what to fix instead of a generic "didn't catch that":
+
+```
+User: send 100 xlm to GAADWVWIJMANHJM7VZYVPNFLOYN7EH2FH6NJKUVTGMPKZ...
+Bot:  Address looks truncated — don't use `...`. Paste the full 56-character Stellar address from your wallet.
+```
 
 ## Build for Production
 

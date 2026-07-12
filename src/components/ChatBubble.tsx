@@ -132,7 +132,7 @@ export function ChatBubble({ message, index }: ChatBubbleProps) {
     >
       {!isUser && <BotAvatar />}
 
-      <div className={`chat-bubble max-w-[min(85%,28rem)] ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
+      <div className={`chat-bubble max-w-[min(92%,34rem)] ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
         {!isUser && <StatusBadge status={message.status} />}
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{formatContent(message.content)}</div>
 

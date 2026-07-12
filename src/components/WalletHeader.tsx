@@ -19,7 +19,7 @@ function formatBalance(balance: string | null): string {
   const value = Number.parseFloat(balance);
   if (Number.isNaN(value)) return balance;
   return value.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   });
 }
@@ -56,19 +56,16 @@ export function WalletHeader({
 
         <div className="header-actions">
           {isConnected && address && (
-            <div className="header-wallet-stat hidden sm:flex">
-              <span className="header-wallet-stat-icon">
-                <WalletIcon />
+            <div className="header-wallet-pill hidden sm:inline-flex">
+              <span className="header-wallet-dot" aria-hidden />
+              <span className="header-wallet-address font-mono">
+                {truncateAddress(address, 5)}
               </span>
-              <span className="header-wallet-stat-text tabular-nums">
+              <span className="header-wallet-balance tabular-nums">
                 {isLoadingBalance ? (
                   <span className="header-wallet-stat-skeleton" />
                 ) : (
-                  <>
-                    <strong>{formatBalance(balance)} XLM</strong>
-                    <span className="header-wallet-stat-sep">·</span>
-                    <span className="font-mono">{truncateAddress(address, 4)}</span>
-                  </>
+                  `${formatBalance(balance)} XLM`
                 )}
               </span>
             </div>
@@ -102,17 +99,18 @@ export function WalletHeader({
 
       {isConnected && address && (
         <div className="header-mobile-bar sm:hidden">
-          <span className="font-mono text-xs" style={{ color: "var(--text-muted)" }}>
-            {truncateAddress(address, 4)}
-          </span>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--text)" }}>
+          <div className="header-wallet-pill">
+            <span className="header-wallet-dot" aria-hidden />
+            <span className="header-wallet-address font-mono text-xs">
+              {truncateAddress(address, 5)}
+            </span>
+            <span className="header-wallet-balance text-sm tabular-nums">
               {isLoadingBalance ? "…" : `${formatBalance(balance)} XLM`}
             </span>
-            <button type="button" onClick={onDisconnect} className="header-ghost-btn text-xs">
-              Disconnect
-            </button>
           </div>
+          <button type="button" onClick={onDisconnect} className="header-ghost-btn text-xs">
+            Disconnect
+          </button>
         </div>
       )}
     </header>

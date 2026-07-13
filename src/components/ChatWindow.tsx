@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "../lib/chat";
-import { BotAvatar } from "./BotAvatar";
-import { ChatBubble } from "./ChatBubble";
+import { ChatMessageList, TypingIndicator } from "./ChatMessageList";
 import { SuggestionLinks } from "./SuggestionLinks";
 
 interface ChatWindowProps {
@@ -184,25 +183,9 @@ export function ChatWindow({
   return (
     <main className={`chat-shell chat-shell-active ${className}`}>
       <div className="chat-messages scrollbar-thin">
-        {messages.map((message, index) => (
-          <ChatBubble key={message.id} message={message} index={index} />
-        ))}
+        <ChatMessageList messages={messages} />
 
-        {isProcessing && (
-          <div className="flex animate-fade-in gap-3 px-1">
-            <BotAvatar />
-            <div className="chat-bubble chat-bubble-bot max-w-xs">
-              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--text-muted)" }}>
-                <span className="typing-dots">
-                  <span />
-                  <span />
-                  <span />
-                </span>
-                Processing…
-              </div>
-            </div>
-          </div>
-        )}
+        {isProcessing && <TypingIndicator />}
 
         <div ref={bottomRef} />
       </div>

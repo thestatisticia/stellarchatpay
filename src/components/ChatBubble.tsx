@@ -4,6 +4,8 @@ import type { ChatMessage } from "../lib/chat";
 interface ChatBubbleProps {
   message: ChatMessage;
   index: number;
+  variant?: "default" | "turn-user" | "turn-bot";
+  showAvatar?: boolean;
 }
 
 function formatContent(content: string): React.ReactNode {
@@ -113,7 +115,12 @@ function StatusBadge({ status }: { status: ChatMessage["status"] }) {
   );
 }
 
-export function ChatBubble({ message, index }: ChatBubbleProps) {
+export function ChatBubble({
+  message,
+  index,
+  variant = "default",
+  showAvatar = true,
+}: ChatBubbleProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
 
@@ -125,39 +132,65 @@ export function ChatBubble({ message, index }: ChatBubbleProps) {
     );
   }
 
+  const bubble = (
+    <div className={`chat-bubble max-w-[min(92%,34rem)] ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
+      {!isUser && <StatusBadge status={message.status} />}
+      <div className="whitespace-pre-wrap text-sm leading-relaxed">{formatContent(message.content)}</div>
+
+      <TransactionCard
+        amount={message.amount}
+        destination={message.destination}
+        hash={message.txHash}
+        explorerUrl={message.explorerUrl}
+        status={message.status}
+      />
+
+      {message.explorerUrl && !message.txHash && message.status === "success" && (
+        <a href={message.explorerUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-xs text-link">
+          View account on Stellar Expert →
+        </a>
+      )}
+
+      {message.txHash && message.status === "error" && message.explorerUrl && (
+        <a href={message.explorerUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-xs text-link">
+          View details →
+        </a>
+      )}
+
+      {variant === "default" && (
+        <p className="chat-time">{message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+      )}
+    </div>
+  );
+
+  if (variant === "turn-user") {
+    return (
+      <div className="chat-turn-user animate-fade-up" style={{ animationDelay: `${index * 30}ms` }}>
+        {bubble}
+      </div>
+    );
+  }
+
+  if (variant === "turn-bot") {
+    return (
+      <div
+        className="chat-turn-bot flex animate-fade-up gap-2.5"
+        style={{ animationDelay: `${index * 30}ms` }}
+      >
+        {showAvatar ? <BotAvatar /> : <div className="w-9 shrink-0" aria-hidden />}
+        {bubble}
+      </div>
+    );
+  }
+
   return (
     <div
       className={`flex animate-fade-up gap-2.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}
       style={{ animationDelay: `${index * 30}ms` }}
     >
-      {!isUser && <BotAvatar />}
+      {!isUser && showAvatar && <BotAvatar />}
 
-      <div className={`chat-bubble max-w-[min(92%,34rem)] ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
-        {!isUser && <StatusBadge status={message.status} />}
-        <div className="whitespace-pre-wrap text-sm leading-relaxed">{formatContent(message.content)}</div>
-
-        <TransactionCard
-          amount={message.amount}
-          destination={message.destination}
-          hash={message.txHash}
-          explorerUrl={message.explorerUrl}
-          status={message.status}
-        />
-
-        {message.explorerUrl && !message.txHash && message.status === "success" && (
-          <a href={message.explorerUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-xs text-link">
-            View account on Stellar Expert →
-          </a>
-        )}
-
-        {message.txHash && message.status === "error" && message.explorerUrl && (
-          <a href={message.explorerUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-xs text-link">
-            View details →
-          </a>
-        )}
-
-        <p className="chat-time">{message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
-      </div>
+      {bubble}
     </div>
   );
 }

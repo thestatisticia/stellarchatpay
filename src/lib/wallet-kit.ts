@@ -20,13 +20,21 @@ class AppFreighterModule extends FreighterModule {
   }
 }
 
+/** Only list xBull when the browser extension is installed — avoids opening wallet.xbull.app for everyone. */
+class AppXBullModule extends xBullModule {
+  async isAvailable(): Promise<boolean> {
+    if (typeof window === "undefined") return false;
+    return Boolean((window as Window & { xBullSDK?: unknown }).xBullSDK);
+  }
+}
+
 let kit: StellarWalletsKit | null = null;
 
 export function getWalletKit(): StellarWalletsKit {
   if (!kit) {
     kit = new StellarWalletsKit({
       network: WalletNetwork.TESTNET,
-      modules: [new AppFreighterModule(), new AlbedoModule(), new xBullModule()],
+      modules: [new AppFreighterModule(), new AlbedoModule(), new AppXBullModule()],
     });
   }
   return kit;

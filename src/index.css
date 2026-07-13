@@ -550,8 +550,24 @@
     padding-block: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.25rem;
     min-height: 0;
+  }
+
+  .chat-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .chat-turn-user {
+    align-self: flex-end;
+    max-width: min(92%, 34rem);
+  }
+
+  .chat-turn-bot {
+    align-self: flex-start;
+    max-width: min(92%, 34rem);
   }
 
   .chat-input-area {

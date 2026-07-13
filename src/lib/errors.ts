@@ -13,18 +13,36 @@ export class AppWalletError extends Error {
   }
 }
 
-export function formatWalletError(error: unknown): string {
-  if (error instanceof AppWalletError) {
-    return error.message;
+/** Wallets like xBull throw plain `{ code, message }` objects — not Error instances. */
+export function extractErrorMessage(error: unknown): string {
+  if (error instanceof AppWalletError) return error.message;
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message !== "[object Object]") {
+      return record.message;
+    }
+    if (record.error && typeof record.error === "object") {
+      const nested = record.error as Record<string, unknown>;
+      if (typeof nested.message === "string") return nested.message;
+    }
   }
-  if (error instanceof Error) {
-    return parseRawMessage(error.message);
-  }
+
   return "Something went wrong. Please try again.";
+}
+
+export function formatWalletError(error: unknown): string {
+  return parseRawMessage(extractErrorMessage(error));
 }
 
 function parseRawMessage(message: string): string {
   const lower = message.toLowerCase();
+
+  if (message === "[object Object]") {
+    return "You rejected the request in your wallet. Nothing was sent.";
+  }
 
   if (
     lower.includes("wallet not found") ||
@@ -32,7 +50,7 @@ function parseRawMessage(message: string): string {
     lower.includes("no wallet") ||
     lower.includes("could not detect")
   ) {
-    return "No Stellar wallet detected. Install Freighter, xBull, or Albedo and try again.";
+    return "No Stellar wallet detected. Install Freighter or Albedo and try again.";
   }
 
   if (
@@ -40,7 +58,9 @@ function parseRawMessage(message: string): string {
     lower.includes("user rejected") ||
     lower.includes("rejected") ||
     lower.includes("denied") ||
-    lower.includes("cancel")
+    lower.includes("cancel") ||
+    lower.includes("closed") ||
+    lower.includes("abort")
   ) {
     return "You rejected the request in your wallet. Nothing was sent.";
   }
@@ -78,7 +98,7 @@ function parseRawMessage(message: string): string {
 }
 
 export function classifyAndThrow(error: unknown): never {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = extractErrorMessage(error);
   const lower = message.toLowerCase();
 
   if (
@@ -88,7 +108,7 @@ export function classifyAndThrow(error: unknown): never {
   ) {
     throw new AppWalletError(
       "WALLET_NOT_FOUND",
-      "No Stellar wallet detected. Install Freighter, xBull, or Albedo and try again."
+      "No Stellar wallet detected. Install Freighter or Albedo and try again."
     );
   }
 
@@ -97,7 +117,10 @@ export function classifyAndThrow(error: unknown): never {
     lower.includes("user rejected") ||
     lower.includes("rejected") ||
     lower.includes("denied") ||
-    lower.includes("cancel")
+    lower.includes("cancel") ||
+    lower.includes("closed") ||
+    lower.includes("abort") ||
+    message === "[object Object]"
   ) {
     throw new AppWalletError(
       "USER_REJECTED",

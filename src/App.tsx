@@ -56,6 +56,19 @@ function App() {
     setMessages((prev) => [...prev, createMessage(message)]);
   }, []);
 
+  const pushPendingMessage = useCallback((message: Omit<ChatMessage, "id" | "timestamp" | "status">) => {
+    const created = createMessage({ ...message, status: "pending" });
+    setMessages((prev) => [...prev, created]);
+    return created.id;
+  }, []);
+
+  const patchMessage = useCallback(
+    (id: string, patch: Partial<Omit<ChatMessage, "id" | "timestamp">>) => {
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+    },
+    []
+  );
+
   const handleLiveEvent = useCallback(
     (event: { from: string; to: string; amount: string; txHash: string }) => {
       if (event.from !== wallet.address && event.to !== wallet.address) return;
@@ -242,10 +255,9 @@ function App() {
         return;
       }
 
-      addMessage({
+      const pendingId = pushPendingMessage({
         role: "bot",
         content: `Executing swap — **${quote.sendAmount} ${quote.fromLabel}** → **≈ ${quote.receiveAmount} ${quote.toLabel}**.\n\nApprove in your wallet when prompted.`,
-        status: "pending",
       });
 
       try {
@@ -258,8 +270,7 @@ function App() {
         pendingSwap.current = null;
         await wallet.refreshBalance(wallet.address);
 
-        addMessage({
-          role: "bot",
+        patchMessage(pendingId, {
           content: `Swap complete — sent **${result.sendAmount} ${result.fromAsset}**, received **${result.receiveAmount} ${result.toAsset}**.`,
           status: "success",
           txHash: result.hash,
@@ -267,8 +278,7 @@ function App() {
           amount: result.receiveAmount,
         });
       } catch (error) {
-        addMessage({
-          role: "bot",
+        patchMessage(pendingId, {
           content: formatWalletError(error),
           status: "error",
         });
@@ -306,10 +316,9 @@ function App() {
         return;
       }
 
-      addMessage({
+      const quotePendingId = pushPendingMessage({
         role: "bot",
         content: "Fetching swap quote from the testnet DEX…",
-        status: "pending",
       });
 
       try {
@@ -322,15 +331,13 @@ function App() {
 
         pendingSwap.current = quote;
 
-        addMessage({
-          role: "bot",
+        patchMessage(quotePendingId, {
           content: formatSwapQuoteMessage(quote),
           status: "info",
         });
       } catch (error) {
         pendingSwap.current = null;
-        addMessage({
-          role: "bot",
+        patchMessage(quotePendingId, {
           content: formatWalletError(error),
           status: "error",
         });
@@ -523,10 +530,9 @@ function App() {
         return;
       }
 
-      addMessage({
+      const paymentPendingId = pushPendingMessage({
         role: "bot",
         content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 8)}…${payment.destination.slice(-6)}\`\n\nApprove in your wallet when prompted.`,
-        status: "pending",
       });
 
       try {
@@ -539,8 +545,7 @@ function App() {
 
         await wallet.refreshBalance(wallet.address);
 
-        addMessage({
-          role: "bot",
+        patchMessage(paymentPendingId, {
           content: "Payment went through on Stellar.",
           status: "success",
           txHash: result.hash,
@@ -550,10 +555,9 @@ function App() {
         });
 
         if (isContractConfigured()) {
-          addMessage({
+          const logPendingId = pushPendingMessage({
             role: "bot",
             content: "Logging payment to Soroban contract…",
-            status: "pending",
           });
 
           try {
@@ -565,24 +569,21 @@ function App() {
               wallet.signTransaction
             );
 
-            addMessage({
-              role: "bot",
+            patchMessage(logPendingId, {
               content: "Payment logged on-chain. Activity feed updated.",
               status: "success",
               txHash: contractTx.hash,
               explorerUrl: contractTx.explorerUrl,
             });
           } catch (error) {
-            addMessage({
-              role: "bot",
+            patchMessage(logPendingId, {
               content: `Payment sent, but contract log failed: ${formatWalletError(error)}`,
               status: "error",
             });
           }
         }
       } catch (error) {
-        addMessage({
-          role: "bot",
+        patchMessage(paymentPendingId, {
           content: formatWalletError(error),
           status: "error",
         });

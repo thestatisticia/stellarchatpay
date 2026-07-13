@@ -109,13 +109,18 @@ function App() {
       });
     } catch (error) {
       const message = formatWalletError(error);
-      if (!message.toLowerCase().includes("cancelled")) {
-        addMessage({
-          role: "bot",
-          content: message,
-          status: "error",
-        });
+      // Only skip a quiet dismiss of the picker — always show wallet-not-found / reject / etc.
+      if (
+        message === "Wallet selection cancelled" ||
+        message === "Wallet connection cancelled."
+      ) {
+        return;
       }
+      addMessage({
+        role: "bot",
+        content: message,
+        status: "error",
+      });
     }
   };
 

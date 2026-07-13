@@ -537,7 +537,7 @@ function App() {
 
       const paymentPendingId = pushPendingMessage({
         role: "bot",
-        content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 8)}…${payment.destination.slice(-6)}\`\n\nApprove in your wallet when prompted.`,
+        content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 6)}…${payment.destination.slice(-6)}\`\n\nApprove in your wallet when prompted.`,
       });
 
       try {
@@ -550,42 +550,55 @@ function App() {
 
         await wallet.refreshBalance(wallet.address);
 
+        if (!isContractConfigured()) {
+          patchMessage(paymentPendingId, {
+            content: "Payment sent on Stellar.",
+            status: "success",
+            txHash: result.hash,
+            explorerUrl: result.explorerUrl,
+            amount: payment.amount,
+            destination: payment.destination,
+          });
+          return;
+        }
+
         patchMessage(paymentPendingId, {
-          content: "Payment went through on Stellar.",
-          status: "success",
+          content: "Payment sent. Logging to Soroban contract — approve if prompted.",
+          status: "pending",
           txHash: result.hash,
           explorerUrl: result.explorerUrl,
           amount: payment.amount,
           destination: payment.destination,
         });
 
-        if (isContractConfigured()) {
-          const logPendingId = pushPendingMessage({
-            role: "bot",
-            content: "Logging payment to Soroban contract…",
+        try {
+          const contractTx = await logPaymentOnContract(
+            wallet.address,
+            payment.destination,
+            payment.amount,
+            result.hash,
+            wallet.signTransaction
+          );
+
+          patchMessage(paymentPendingId, {
+            content: "Payment sent and logged on-chain.",
+            status: "success",
+            txHash: result.hash,
+            explorerUrl: result.explorerUrl,
+            contractTxHash: contractTx.hash,
+            contractExplorerUrl: contractTx.explorerUrl,
+            amount: payment.amount,
+            destination: payment.destination,
           });
-
-          try {
-            const contractTx = await logPaymentOnContract(
-              wallet.address,
-              payment.destination,
-              payment.amount,
-              result.hash,
-              wallet.signTransaction
-            );
-
-            patchMessage(logPendingId, {
-              content: "Payment logged on-chain. Activity feed updated.",
-              status: "success",
-              txHash: contractTx.hash,
-              explorerUrl: contractTx.explorerUrl,
-            });
-          } catch (error) {
-            patchMessage(logPendingId, {
-              content: `Payment sent, but contract log failed: ${formatWalletError(error)}`,
-              status: "error",
-            });
-          }
+        } catch (error) {
+          patchMessage(paymentPendingId, {
+            content: `Payment sent on Stellar, but contract log failed: ${formatWalletError(error)}`,
+            status: "success",
+            txHash: result.hash,
+            explorerUrl: result.explorerUrl,
+            amount: payment.amount,
+            destination: payment.destination,
+          });
         }
       } catch (error) {
         patchMessage(paymentPendingId, {

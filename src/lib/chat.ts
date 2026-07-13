@@ -10,6 +10,9 @@ export interface ChatMessage {
   status?: MessageStatus;
   txHash?: string;
   explorerUrl?: string;
+  /** Soroban log_payment tx (shown with payment in one card). */
+  contractTxHash?: string;
+  contractExplorerUrl?: string;
   amount?: string;
   destination?: string;
 }

@@ -1,5 +1,6 @@
 import { BotAvatar } from "./BotAvatar";
 import type { ChatMessage } from "../lib/chat";
+import { truncateAddress } from "../lib/stellar";
 
 interface ChatBubbleProps {
   message: ChatMessage;
@@ -8,8 +9,15 @@ interface ChatBubbleProps {
   showAvatar?: boolean;
 }
 
+function shortenLongTokens(text: string): string {
+  return text
+    .replace(/\b(G[A-Z2-7]{55})\b/g, (_, addr: string) => truncateAddress(addr, 6))
+    .replace(/\b([0-9a-f]{64})\b/gi, (_, hash: string) => `${hash.slice(0, 8)}…${hash.slice(-8)}`);
+}
+
 function formatContent(content: string): React.ReactNode {
-  const parts = content.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
+  const shortened = shortenLongTokens(content);
+  const parts = shortened.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
   return parts.map((part, index) => {
     if (part.startsWith("`") && part.endsWith("`")) {
       return (
@@ -34,24 +42,31 @@ function TransactionCard({
   destination,
   hash,
   explorerUrl,
+  contractTxHash,
+  contractExplorerUrl,
   status,
 }: {
   amount?: string;
   destination?: string;
   hash?: string;
   explorerUrl?: string;
+  contractTxHash?: string;
+  contractExplorerUrl?: string;
   status: ChatMessage["status"];
 }) {
-  if (!hash || status !== "success") return null;
+  if (!hash || (status !== "success" && status !== "pending")) return null;
+  if (status === "pending" && !amount) return null;
 
   return (
     <div className="tx-card mt-3 overflow-hidden rounded-lg">
       <div className="tx-card-header px-3 py-2">
-        <p className="text-[10px] font-medium uppercase tracking-wider">Payment confirmed</p>
+        <p className="text-[10px] font-medium uppercase tracking-wider">
+          {status === "pending" ? "Payment in progress" : "Payment confirmed"}
+        </p>
       </div>
       <div className="space-y-2 px-3 py-2.5 text-xs">
         {amount && (
-          <div className="flex justify-between gap-4">
+          <div className="tx-row">
             <span style={{ color: "var(--text-muted)" }}>Amount</span>
             <span className="font-medium tabular-nums" style={{ color: "var(--text)" }}>
               {amount} XLM
@@ -59,36 +74,70 @@ function TransactionCard({
           </div>
         )}
         {destination && (
-          <div className="flex justify-between gap-4">
+          <div className="tx-row">
             <span className="shrink-0" style={{ color: "var(--text-muted)" }}>
               Recipient
             </span>
-            <span className="truncate font-mono text-[10px]" style={{ color: "var(--text-secondary)" }}>
-              {destination.slice(0, 10)}…{destination.slice(-8)}
+            <span className="tx-mono" title={destination}>
+              {truncateAddress(destination, 6)}
             </span>
           </div>
         )}
-        <div className="flex justify-between gap-4">
-          <span style={{ color: "var(--text-muted)" }}>Hash</span>
-          <span className="truncate font-mono text-[10px]" style={{ color: "var(--text-secondary)" }}>
-            {hash}
+        <div className="tx-row">
+          <span style={{ color: "var(--text-muted)" }}>Payment</span>
+          <span className="tx-mono" title={hash}>
+            {hash.slice(0, 8)}…{hash.slice(-8)}
           </span>
         </div>
+        {contractTxHash && (
+          <div className="tx-row">
+            <span style={{ color: "var(--text-muted)" }}>Contract log</span>
+            <span className="tx-mono" title={contractTxHash}>
+              {contractTxHash.slice(0, 8)}…{contractTxHash.slice(-8)}
+            </span>
+          </div>
+        )}
       </div>
-      {explorerUrl && (
-        <a
-          href={explorerUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="tx-card-link flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium"
-        >
-          View on Stellar Expert
-          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-        </a>
+      {(explorerUrl || contractExplorerUrl) && status === "success" && (
+        <div className="tx-card-links">
+          {explorerUrl && (
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tx-card-link"
+            >
+              View payment
+              <ExternalIcon />
+            </a>
+          )}
+          {contractExplorerUrl && (
+            <a
+              href={contractExplorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tx-card-link"
+            >
+              View contract log
+              <ExternalIcon />
+            </a>
+          )}
+        </div>
       )}
     </div>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+      />
+    </svg>
   );
 }
 
@@ -135,13 +184,15 @@ export function ChatBubble({
   const bubble = (
     <div className={`chat-bubble max-w-[min(92%,34rem)] ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
       {!isUser && <StatusBadge status={message.status} />}
-      <div className="whitespace-pre-wrap text-sm leading-relaxed">{formatContent(message.content)}</div>
+      <div className="chat-bubble-text">{formatContent(message.content)}</div>
 
       <TransactionCard
         amount={message.amount}
         destination={message.destination}
         hash={message.txHash}
         explorerUrl={message.explorerUrl}
+        contractTxHash={message.contractTxHash}
+        contractExplorerUrl={message.contractExplorerUrl}
         status={message.status}
       />
 

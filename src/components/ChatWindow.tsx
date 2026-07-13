@@ -9,6 +9,8 @@ interface ChatWindowProps {
   isProcessing: boolean;
   isConnected: boolean;
   isConnecting: boolean;
+  connectError?: string | null;
+  onDismissConnectError?: () => void;
   input: string;
   onInputChange: (value: string) => void;
   onSubmit: () => void;
@@ -30,6 +32,8 @@ export function ChatWindow({
   isProcessing,
   isConnected,
   isConnecting,
+  connectError = null,
+  onDismissConnectError,
   input,
   onInputChange,
   onSubmit,
@@ -103,6 +107,25 @@ export function ChatWindow({
           >
             {isConnecting ? "Connecting…" : "Connect Wallet"}
           </button>
+
+          {connectError && (
+            <div className="connect-error-banner" role="alert">
+              <div className="connect-error-banner-body">
+                <span className="status-badge badge-error">Failed</span>
+                <p>{connectError}</p>
+              </div>
+              {onDismissConnectError && (
+                <button
+                  type="button"
+                  className="connect-error-dismiss"
+                  onClick={onDismissConnectError}
+                  aria-label="Dismiss error"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          )}
 
           <p className="hero-wallet-links">
             Need a wallet?{" "}

@@ -50,6 +50,7 @@ function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const pendingSwap = useRef<SwapQuote | null>(null);
 
   const addMessage = useCallback((message: Omit<ChatMessage, "id" | "timestamp">) => {
@@ -97,8 +98,10 @@ function App() {
   }, [addMessage]);
 
   const handleConnect = async () => {
+    setConnectError(null);
     try {
       const { address, walletName, accountExists } = await wallet.connect();
+      setConnectError(null);
       addMessage({ role: "system", content: `Connected via ${walletName}` });
       addMessage({
         role: "bot",
@@ -116,11 +119,8 @@ function App() {
       ) {
         return;
       }
-      addMessage({
-        role: "bot",
-        content: message,
-        status: "error",
-      });
+      // Chat is hidden until connect succeeds — show errors on the hero screen instead.
+      setConnectError(message);
     }
   };
 
@@ -671,6 +671,8 @@ function App() {
         isProcessing={isProcessing}
         isConnected={wallet.isConnected}
         isConnecting={wallet.isConnecting}
+        connectError={connectError}
+        onDismissConnectError={() => setConnectError(null)}
         input={input}
         onInputChange={setInput}
         onSubmit={handleSubmit}

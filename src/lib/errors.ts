@@ -48,9 +48,14 @@ function parseRawMessage(message: string): string {
     lower.includes("wallet not found") ||
     lower.includes("not installed") ||
     lower.includes("no wallet") ||
-    lower.includes("could not detect")
+    lower.includes("could not detect") ||
+    lower.includes("download it from") ||
+    lower.includes("freighter is not connected")
   ) {
-    return "No Stellar wallet detected. Install Freighter or Albedo and try again.";
+    if (message.toLowerCase().includes("download it from")) {
+      return message;
+    }
+    return "Wallet not found. Install Freighter, Albedo, or xBull first, then try Connect again.";
   }
 
   if (
@@ -104,11 +109,15 @@ export function classifyAndThrow(error: unknown): never {
   if (
     lower.includes("wallet not found") ||
     lower.includes("not installed") ||
-    lower.includes("no wallet")
+    lower.includes("no wallet") ||
+    lower.includes("download it from") ||
+    lower.includes("freighter is not connected")
   ) {
     throw new AppWalletError(
       "WALLET_NOT_FOUND",
-      "No Stellar wallet detected. Install Freighter or Albedo and try again."
+      message.toLowerCase().includes("download it from")
+        ? message
+        : "Wallet not found. Install Freighter, Albedo, or xBull first, then try Connect again."
     );
   }
 

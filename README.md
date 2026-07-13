@@ -89,31 +89,28 @@ See [contracts/README.md](contracts/README.md). After deploy, set `VITE_CONTRACT
 
 ## Error handling (Yellow Belt)
 
-The app catches common failures and shows a clear message in chat (with a **Failed** badge when appropriate).
+The three required Level 2 error types:
 
 | Error | Trigger | User sees |
 |-------|---------|-----------|
-| Wallet not found | No extension / wallet unavailable | "No Stellar wallet detected. Install Freighter, xBull, or Albedo…" |
-| User rejected | Declined sign in wallet modal | "You rejected the request in your wallet. Nothing was sent." |
-| Insufficient balance | Send or swap amount exceeds balance | "Insufficient XLM balance. You have **19,990.99 XLM** but need at least **100,000.00 XLM**." (shows actual vs required amounts) |
-| Invalid / truncated address | `send` with wrong, incomplete, or `...` address | "Address is incomplete (42/56 characters)…" or "Address looks truncated — don't use `...`" |
-| Bad send syntax | `send 100 xlm to G…` with malformed key | Specific guidance to paste the full 56-character `G` address |
-| Unknown command | Unrecognized input | Info message pointing to `help` (not marked as Failed) |
+| **Wallet not found** | User picks Freighter/xBull from the modal but the extension is not installed | `Wallet not found: xBull is not installed. Download it from https://xbull.app first…` |
+| **User rejected** | User cancels / declines signing in the wallet | `You rejected the request in your wallet. Nothing was sent.` |
+| **Insufficient balance** | Send or swap amount exceeds balance | `Insufficient XLM balance. You have … but need at least …` |
+
+Wallets stay listed in the picker (Freighter, Albedo, xBull). Missing wallets are not hidden — clicking one that is not installed returns the **wallet not found** error in chat.
+
+### User rejected (screenshot)
+
+![User rejected transaction](screenshots/user-rejected.png)
 
 ### Insufficient balance (swap example)
-
-Before submitting a swap, the app checks your balance:
 
 ```
 User: swap 100000 xlm to usdc
 Bot:  Insufficient XLM balance. You have 19990.9898747 XLM but need at least 100000.00001 XLM.
 ```
 
-No wallet popup — the check runs first so you don't waste a rejected transaction.
-
-### Invalid recipient address (send example)
-
-If the address is truncated or wrong, the app explains what to fix instead of a generic "didn't catch that":
+### Invalid recipient address (extra)
 
 ```
 User: send 100 xlm to GAADWVWIJMANHJM7VZYVPNFLOYN7EH2FH6NJKUVTGMPKZ...
@@ -160,9 +157,13 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 
 ![Payment success](screenshots/payment-success.png)
 
-### Error handling
+### Error handling — insufficient balance
 
 ![Error handling](screenshots/error-handling.png)
+
+### Error handling — user rejected
+
+![User rejected](screenshots/user-rejected.png)
 
 ### Multi-wallet picker modal
 

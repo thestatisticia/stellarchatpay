@@ -1,3 +1,4 @@
+import { isConnected as freighterIsConnected } from "@stellar/freighter-api";
 import {
   AlbedoModule,
   FreighterModule,
@@ -7,11 +8,11 @@ import {
   type ISupportedWallet,
 } from "@creit.tech/stellar-wallets-kit";
 import { NETWORK_PASSPHRASE } from "./stellar";
-import { AppWalletError, classifyAndThrow } from "./errors";
+import { AppWalletError, classifyAndThrow, extractErrorMessage } from "./errors";
 
 /**
  * Keep Freighter listed in the modal even if the extension race fails.
- * Actual install check runs when the user picks Freighter.
+ * Real install status is checked with Freighter's official async API on click.
  */
 class AppFreighterModule extends FreighterModule {
   async isAvailable(): Promise<boolean> {
@@ -21,7 +22,7 @@ class AppFreighterModule extends FreighterModule {
 
 /**
  * Keep xBull listed for Yellow Belt multi-wallet UX.
- * Install check runs on click — missing extension → wallet-not-found error in chat.
+ * Install check runs on click — missing extension → wallet-not-found banner.
  */
 class AppXBullModule extends xBullModule {
   async isAvailable(): Promise<boolean> {
@@ -35,10 +36,28 @@ const WALLET_INSTALL_URLS: Record<string, string> = {
   albedo: "https://albedo.link",
 };
 
-function isFreighterInstalled(): boolean {
-  if (typeof window === "undefined") return false;
-  const w = window as Window & { freighter?: unknown; freighterApi?: unknown };
-  return Boolean(w.freighter) || Boolean(w.freighterApi);
+/** Use Freighter's official API — do NOT rely on window.freighter (often unset). */
+async function isFreighterInstalled(): Promise<boolean> {
+  try {
+    const result = await freighterIsConnected();
+    if (result.isConnected) return true;
+
+    if (typeof window !== "undefined") {
+      const w = window as Window & {
+        freighter?: unknown;
+        freighterApi?: unknown;
+        stellar?: { provider?: string };
+      };
+      if (w.freighter || w.freighterApi || w.stellar?.provider === "freighter") {
+        return true;
+      }
+    }
+
+    return false;
+  } catch {
+    // Detection failed — don't block; let Freighter connect flow try.
+    return true;
+  }
 }
 
 function isXBullInstalled(): boolean {
@@ -50,24 +69,57 @@ function walletKey(wallet: ISupportedWallet): string {
   return `${wallet.id} ${wallet.name}`.toLowerCase();
 }
 
-/** Yellow Belt: wallet stays in the list; click without install → clear not-found error. */
-function assertWalletInstalled(wallet: ISupportedWallet): void {
+function walletNotFoundError(name: string, url: string): AppWalletError {
+  return new AppWalletError(
+    "WALLET_NOT_FOUND",
+    `Wallet not found: ${name} is not installed. Download it from ${url} first, then try Connect again.`
+  );
+}
+
+/** Only error when the wallet is actually missing — never block an installed Freighter. */
+async function assertWalletInstalled(wallet: ISupportedWallet): Promise<void> {
   const key = walletKey(wallet);
   const name = wallet.name || wallet.id;
 
-  if (key.includes("freighter") && !isFreighterInstalled()) {
-    throw new AppWalletError(
-      "WALLET_NOT_FOUND",
-      `Wallet not found: ${name} is not installed. Download it from ${WALLET_INSTALL_URLS.freighter} first, then try Connect again.`
-    );
+  if (key.includes("freighter")) {
+    const installed = await isFreighterInstalled();
+    if (!installed) {
+      throw walletNotFoundError(name, WALLET_INSTALL_URLS.freighter);
+    }
+    return;
   }
 
   if (key.includes("xbull") && !isXBullInstalled()) {
-    throw new AppWalletError(
-      "WALLET_NOT_FOUND",
-      `Wallet not found: ${name} is not installed. Download it from ${WALLET_INSTALL_URLS.xbull} first, then try Connect again.`
-    );
+    throw walletNotFoundError(name, WALLET_INSTALL_URLS.xbull);
   }
+}
+
+function mapConnectFailure(wallet: ISupportedWallet, error: unknown): unknown {
+  const key = walletKey(wallet);
+  const name = wallet.name || wallet.id;
+  const message = extractErrorMessage(error).toLowerCase();
+
+  if (
+    message.includes("reject") ||
+    message.includes("denied") ||
+    message.includes("cancel") ||
+    message.includes("declined")
+  ) {
+    return error;
+  }
+
+  if (
+    key.includes("freighter") &&
+    (message.includes("not connected") ||
+      message.includes("not installed") ||
+      message.includes("not found") ||
+      message.includes("could not find") ||
+      message.includes("no freighter"))
+  ) {
+    return walletNotFoundError(name, WALLET_INSTALL_URLS.freighter);
+  }
+
+  return error;
 }
 
 let kit: StellarWalletsKit | null = null;
@@ -104,16 +156,9 @@ export async function openWalletModal(): Promise<WalletConnection> {
       onWalletSelected: (wallet: ISupportedWallet) => {
         selected = true;
 
-        // Run install check BEFORE any wallet SDK call (xBull would otherwise open a blank popup).
-        try {
-          assertWalletInstalled(wallet);
-        } catch (error) {
-          settle(() => reject(error));
-          return;
-        }
-
         void (async () => {
           try {
+            await assertWalletInstalled(wallet);
             walletKit.setWallet(wallet.id);
             const { address } = await walletKit.getAddress();
             if (!address) {
@@ -122,13 +167,11 @@ export async function openWalletModal(): Promise<WalletConnection> {
             }
             settle(() => resolve({ address, walletName: wallet.name }));
           } catch (error) {
-            settle(() => reject(error));
+            settle(() => reject(mapConnectFailure(wallet, error)));
           }
         })();
       },
       onClosed: (err) => {
-        // Selecting a wallet removes the modal — ignore that close so it doesn't
-        // overwrite wallet-not-found with a silent "cancelled".
         if (selected) return;
         settle(() =>
           reject(err instanceof Error ? err : new Error("Wallet selection cancelled"))

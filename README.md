@@ -97,7 +97,7 @@ The three required Level 2 error types:
 | **User rejected** | User cancels / declines signing in the wallet | `You rejected the request in your wallet. Nothing was sent.` |
 | **Insufficient balance** | Send or swap amount exceeds balance | `Insufficient XLM balance. You have … but need at least …` |
 
-Wallets stay listed in the picker (Freighter, Albedo, xBull). Missing wallets are not hidden — clicking one that is not installed returns the **wallet not found** error in chat.
+Wallets stay listed in the picker (Freighter, Albedo, xBull). Missing wallets are not hidden — clicking one that is not installed shows a **wallet not found** banner on the connect screen.
 
 ### User rejected (screenshot)
 
@@ -138,7 +138,7 @@ npm run preview
 |-------|-------|
 | **Contract ID** | `CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` |
 | **Deploy tx** | [2186cfb1…](https://stellar.expert/explorer/testnet/tx/2186cfb1d919bf260f3fbe1ad5178de75a717391d42399b395fcb5c397b05e04) |
-| **Contract call tx** (`log_payment`) | [f9b9753e…](https://stellar.expert/explorer/testnet/tx/f9b9753eb44aff2c0548e709d3f09168a843ca72786a390b1cbb7f73159f25b0) |
+| **Contract call tx** (`log_payment`) | [c63e9b89…](https://stellar.expert/explorer/testnet/tx/c63e9b8946c1a174e2eb15bbff96bc3113cb58c61f8607563e3358e958cbfae7) |
 | **Network** | Stellar Testnet |
 
 Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` in Vercel and redeploy.

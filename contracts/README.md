@@ -1,34 +1,60 @@
-# Deploy payment-log contract (Yellow Belt)
+# Soroban contracts (Yellow + Orange Belt)
+
+## Contracts
+
+| Contract | Path | Role |
+|----------|------|------|
+| **payment-log** | `contracts/payment-log` | Records payments + emits events for the activity feed |
+| **escrow** | `contracts/escrow` | Locks native XLM, releases/refunds, **calls payment-log** on release (inter-contract) |
 
 ## Prerequisites
 
 - [Stellar CLI](https://developers.stellar.org/docs/tools/cli)
-- Rust + `wasm32-unknown-unknown` target
+- Rust + `wasm32v1-none` target (`rustup target add wasm32v1-none`)
 - Funded testnet account (Friendbot)
 
-## Steps
+## Build & test locally
 
 ```bash
-# 1. Generate a deployer key
-stellar keys generate alice --network testnet
+# Unit tests (no deploy needed)
+npm run contract:test
 
-# 2. Fund it
-curl "https://friendbot.stellar.org/?addr=$(stellar keys address alice)"
-
-# 3. Build the contract WASM
-cd contracts/payment-log
-stellar contract build
-cd ../..
-
-# 4. Deploy to testnet
-npm run contract:deploy
+# Build WASM for both contracts
+npm run contract:build
 ```
 
-This writes `VITE_CONTRACT_ID` to `.env.local`. Add the same variable in **Vercel → Settings → Environment Variables**, then redeploy the frontend.
+## Deploy (testnet)
 
-## Verify
+```bash
+# 1. Key + fund (once)
+stellar keys generate alice --network testnet
+curl "https://friendbot.stellar.org/?addr=$(stellar keys address alice)"
 
-1. Send a payment in the app (`send 1 to G...`)
-2. Approve the contract `log_payment` call in your wallet
-3. Type `activity` in chat to see the on-chain feed
-4. Copy the contract call tx hash from chat into [Stellar Expert](https://stellar.expert/explorer/testnet)
+# 2. Deploy payment-log → writes VITE_CONTRACT_ID
+npm run contract:build
+npm run contract:deploy
+
+# 3. Deploy escrow + init(payment_log) → writes VITE_ESCROW_CONTRACT_ID
+npm run contract:deploy:escrow
+```
+
+Restart `npm run dev` after updating `.env.local`.
+
+## Verify escrow flow in the app
+
+1. `escrow 1 to G...` — lock XLM (approve wallet)
+2. `escrow status 1` — confirm **Open**
+3. `escrow release 1` — pays recipient + invokes payment-log
+4. `activity` — should include the escrow release log
+
+## Architecture
+
+```
+User wallet
+   │
+   ├─ create(escrow) ──► escrow contract (holds XLM via native SAC)
+   │
+   └─ release(id) ──► escrow
+                        ├─ transfer XLM → recipient
+                        └─ invoke payment_log.log_payment(...)   ← inter-contract
+```

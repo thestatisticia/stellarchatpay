@@ -21,6 +21,14 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 - **Real-time feed** — `activity` command + live event polling in chat
 - **Error handling** — wallet not found, user rejected, insufficient balance
 
+## Level 3 — Orange Belt (in progress — localhost)
+
+- **Escrow smart contract** — lock / release / refund native XLM
+- **Inter-contract calls** — `escrow.release` invokes `payment-log.log_payment`
+- **CI/CD** — GitHub Actions (frontend tests + contract tests)
+- **Automated tests** — Vitest (frontend) + `cargo test` (contracts)
+- **Production docs** — architecture + deploy workflow in `contracts/README.md`
+
 ---
 
 ## Features
@@ -30,6 +38,7 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 - **Any-wallet balance lookup** — `balance G...`
 - **Friendbot funding** — `fund` or `fund G...`
 - **Chat-based payments** — send XLM with natural commands
+- **Escrow in chat** — `escrow 10 to G...` / `escrow release <id>` / `escrow refund <id>`
 - **DEX swaps in chat** — swap XLM ↔ USDC via path payments on testnet
 - **On-chain activity log** — Soroban contract + event feed
 - **Transaction feedback** — pending / success / failure with explorer links
@@ -50,6 +59,10 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 | `balance usdc` | Show your USDC balance |
 | `send 10 to G...` | Send XLM (also logged on-chain when contract is configured) |
 | `pay 5 G...` | Alias for send |
+| `escrow 10 to G...` | Lock XLM in escrow for a recipient |
+| `escrow release 1` | Release escrow #1 (pays recipient + calls payment-log) |
+| `escrow refund 1` | Refund escrow #1 to sender |
+| `escrow status 1` | Show escrow status / parties / amount |
 
 ## Tech Stack
 
@@ -70,14 +83,37 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 ```bash
 git clone https://github.com/thestatisticia/stellarchatpay.git
 cd stellarchatpay
-npm install
+npm install --ignore-scripts
 cp .env.example .env.local
+# After deploying contracts, fill VITE_CONTRACT_ID and VITE_ESCROW_CONTRACT_ID
 npm run dev
 ```
 
-### Deploy the Soroban contract
+### Tests (Orange Belt)
 
-See [contracts/README.md](contracts/README.md). After deploy, set `VITE_CONTRACT_ID` in `.env.local` and Vercel.
+```bash
+# Frontend unit tests
+npm test
+
+# Soroban contract tests
+npm run contract:test
+```
+
+### Deploy the Soroban contracts
+
+See [contracts/README.md](contracts/README.md). After deploy, set in `.env.local` (and later Vercel):
+
+- `VITE_CONTRACT_ID` — payment-log
+- `VITE_ESCROW_CONTRACT_ID` — escrow
+
+### CI/CD
+
+GitHub Actions workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+Runs on push/PR to `main`:
+
+1. `npm ci` → `npm test` → `npm run build`
+2. `cargo test` for `payment-log` and `escrow`
 
 ## Usage
 
@@ -189,6 +225,19 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 - [x] Contract call tx hash in README (`log_payment`)
 - [x] Screenshot: wallet options modal
 - [x] 2+ meaningful commits on same repo
+
+### Orange Belt (Level 3) — local checklist
+
+- [x] Advanced escrow contract + inter-contract call to payment-log
+- [x] Frontend escrow commands + loading / error states
+- [x] Contract tests (`cargo test`) — 3+
+- [x] Frontend tests (`npm test`) — 3+
+- [x] CI/CD workflow (GitHub Actions)
+- [ ] Escrow deployed on testnet + IDs in env (do on localhost first)
+- [ ] Screenshot: mobile responsive UI
+- [ ] Screenshot: CI pipeline green (after push when Level 2 review is done)
+- [ ] Screenshot: test output with 3+ passing tests
+- [ ] Demo video (1–2 minutes)
 
 ## License
 

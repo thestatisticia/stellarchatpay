@@ -28,6 +28,12 @@ export interface ParsedSwapCommand {
   to: "xlm" | "usdc";
 }
 
+export type ParsedEscrowCommand =
+  | { action: "create"; amount: string; destination: string }
+  | { action: "release"; id: number }
+  | { action: "refund"; id: number }
+  | { action: "status"; id: number };
+
 const SEND_PATTERNS = [
   /^(?:send|pay|transfer)\s+(\d+(?:\.\d+)?)\s*(?:xlm)?\s+(?:to\s+)?(G[A-Z2-7]{55})$/i,
   /^(?:send|pay|transfer)\s+(\d+(?:\.\d+)?)\s+to\s+(G[A-Z2-7]{55})$/i,
@@ -60,6 +66,18 @@ const TRUST_PATTERNS = [/^trust\s+usdc$/i, /^add\s+usdc\s+trustline$/i];
 
 const CONFIRM_PATTERNS = [/^confirm(?:\s+swap)?$/i, /^yes$/i];
 
+const ESCROW_CREATE_PATTERNS = [
+  /^escrow(?:\s+create)?\s+(\d+(?:\.\d+)?)\s*(?:xlm)?\s+(?:to|for)\s+(G[A-Z2-7]{55})$/i,
+  /^lock\s+(\d+(?:\.\d+)?)\s*(?:xlm)?\s+(?:to|for)\s+(G[A-Z2-7]{55})$/i,
+];
+
+const ESCROW_RELEASE_PATTERNS = [/^escrow\s+release\s+(\d+)$/i, /^release\s+escrow\s+(\d+)$/i];
+const ESCROW_REFUND_PATTERNS = [/^escrow\s+refund\s+(\d+)$/i, /^refund\s+escrow\s+(\d+)$/i];
+const ESCROW_STATUS_PATTERNS = [
+  /^escrow\s+(?:status|get|show)\s+(\d+)$/i,
+  /^escrow\s+(\d+)$/i,
+];
+
 export function parseConfirmCommand(input: string): boolean {
   return CONFIRM_PATTERNS.some((pattern) => pattern.test(input.trim()));
 }
@@ -78,6 +96,30 @@ export function parseSwapCommand(input: string): ParsedSwapCommand | null {
       if (from === to) return null;
       return { amount: match[1], from, to };
     }
+  }
+  return null;
+}
+
+export function parseEscrowCommand(input: string): ParsedEscrowCommand | null {
+  const trimmed = input.trim();
+
+  for (const pattern of ESCROW_CREATE_PATTERNS) {
+    const match = trimmed.match(pattern);
+    if (match) {
+      return { action: "create", amount: match[1], destination: match[2] };
+    }
+  }
+  for (const pattern of ESCROW_RELEASE_PATTERNS) {
+    const match = trimmed.match(pattern);
+    if (match) return { action: "release", id: Number(match[1]) };
+  }
+  for (const pattern of ESCROW_REFUND_PATTERNS) {
+    const match = trimmed.match(pattern);
+    if (match) return { action: "refund", id: Number(match[1]) };
+  }
+  for (const pattern of ESCROW_STATUS_PATTERNS) {
+    const match = trimmed.match(pattern);
+    if (match) return { action: "status", id: Number(match[1]) };
   }
   return null;
 }
@@ -184,6 +226,7 @@ Tap a quick action below or type a command:
 • \`activity\` — live payment feed from the Soroban contract
 • \`swap 10 xlm to usdc\` — get a quote, then type \`confirm\`
 • \`send 10 to G...\` — pay someone (logged on-chain)
+• \`escrow 10 to G...\` — lock XLM, then \`escrow release <id>\`
 
 Connect via **Freighter, Albedo, or xBull** using the wallet picker.`;
 
@@ -201,11 +244,16 @@ export const HELP_MESSAGE = `**Commands**
 \`confirm\` — approve a pending swap quote
 \`activity\` — recent payments from the on-chain activity feed
 \`send <amount> to <address>\` — send a payment (also logged to contract)
+\`escrow <amount> to <address>\` — lock XLM in the escrow contract
+\`escrow release <id>\` — release escrow to recipient (calls payment-log)
+\`escrow refund <id>\` — refund escrow to sender
+\`escrow status <id>\` — show escrow details
 
 **Also works:**
 • \`pay 5 G...\`
 • \`transfer 2 XLM to G...\`
 • \`10 xlm to G...\`
 • \`exchange 5 usdc to xlm\`
+• \`lock 10 to G...\`
 
 **Tip:** Stellar addresses always start with \`G\` and are 56 characters long.`;

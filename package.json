@@ -1,16 +1,20 @@
 {
   "name": "stellarchat-pay",
-  "version": "2.0.0",
-  "description": "Send XLM payments through a chat interface on Stellar testnet",
+  "version": "3.0.0",
+  "description": "Chat-based Stellar testnet dApp with payments, escrow, and Soroban contracts",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint .",
-    "contract:build": "cd contracts/payment-log && stellar contract build",
-    "contract:deploy": "node scripts/deploy-contract.mjs"
+    "contract:build": "cd contracts/payment-log && stellar contract build && cd ../escrow && stellar contract build",
+    "contract:test": "cd contracts/payment-log && cargo test && cd ../escrow && cargo test",
+    "contract:deploy": "node scripts/deploy-contract.mjs",
+    "contract:deploy:escrow": "node scripts/deploy-escrow.mjs"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^1.9.5",
@@ -27,6 +31,7 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.4.5",
-    "vite": "^5.4.2"
+    "vite": "^5.4.2",
+    "vitest": "^3.2.7"
   }
 }

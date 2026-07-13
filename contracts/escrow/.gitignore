@@ -1,0 +1,2 @@
+# Generated snapshots from `cargo test` — keep out of git
+**/test_snapshots/

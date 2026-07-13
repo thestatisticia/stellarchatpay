@@ -4,7 +4,7 @@ import { WalletHeader } from "./components/WalletHeader";
 import { usePaymentEvents } from "./hooks/usePaymentEvents";
 import { useTheme } from "./hooks/useTheme";
 import { useWallet } from "./hooks/useWallet";
-import { isContractConfigured } from "./config/contract";
+import { isContractConfigured, isEscrowConfigured } from "./config/contract";
 import {
   HELP_MESSAGE,
   WELCOME_MESSAGE,
@@ -13,6 +13,7 @@ import {
   explainSwapCommandFailure,
   parseBalanceCommand,
   parseConfirmCommand,
+  parseEscrowCommand,
   parseFundCommand,
   parseSendCommand,
   parseSwapCommand,
@@ -24,6 +25,12 @@ import {
   getContractPaymentCount,
   logPaymentOnContract,
 } from "./lib/contract";
+import {
+  createEscrow,
+  getEscrow,
+  refundEscrow,
+  releaseEscrow,
+} from "./lib/escrow";
 import {
   assertSufficientBalance,
   formatWalletError,
@@ -141,6 +148,152 @@ function App() {
     if (command === "help") {
       addMessage({ role: "bot", content: HELP_MESSAGE, status: "info" });
       return;
+    }
+
+    const escrow = parseEscrowCommand(rawInput);
+    if (escrow) {
+      if (!wallet.address) return;
+
+      if (!isEscrowConfigured()) {
+        addMessage({
+          role: "bot",
+          content:
+            "Escrow contract not configured yet. Deploy it locally, set `VITE_ESCROW_CONTRACT_ID` in `.env.local`, then restart `npm run dev`.",
+          status: "error",
+        });
+        return;
+      }
+
+      if (escrow.action === "status") {
+        addMessage({
+          role: "bot",
+          content: `Looking up escrow **#${escrow.id}**…`,
+          status: "pending",
+        });
+        try {
+          const entry = await getEscrow(escrow.id);
+          if (!entry) {
+            addMessage({
+              role: "bot",
+              content: `Escrow **#${escrow.id}** was not found.`,
+              status: "error",
+            });
+            return;
+          }
+          addMessage({
+            role: "bot",
+            content: `**Escrow #${entry.id}** — **${entry.status}**\n\n• Amount: **${entry.amount} XLM**\n• From: \`${entry.from.slice(0, 6)}…${entry.from.slice(-6)}\`\n• To: \`${entry.to.slice(0, 6)}…${entry.to.slice(-6)}\``,
+            status: "success",
+          });
+        } catch (error) {
+          addMessage({
+            role: "bot",
+            content: formatWalletError(error),
+            status: "error",
+          });
+        }
+        return;
+      }
+
+      if (escrow.action === "create") {
+        const amount = parseFloat(escrow.amount);
+        if (Number.isNaN(amount) || amount <= 0) {
+          addMessage({
+            role: "bot",
+            content: "Enter an amount greater than 0.",
+            status: "error",
+          });
+          return;
+        }
+        if (!isValidStellarAddress(escrow.destination)) {
+          addMessage({
+            role: "bot",
+            content: "That doesn't look like a valid Stellar address (starts with `G`, 56 chars).",
+            status: "error",
+          });
+          return;
+        }
+        if (escrow.destination === wallet.address) {
+          addMessage({
+            role: "bot",
+            content: "You can't escrow to your own address.",
+            status: "error",
+          });
+          return;
+        }
+
+        try {
+          await assertSufficientBalance(wallet.address, escrow.amount, fetchXlmBalance);
+        } catch (error) {
+          addMessage({
+            role: "bot",
+            content: formatWalletError(error),
+            status: "error",
+          });
+          return;
+        }
+
+        const pendingId = pushPendingMessage({
+          role: "bot",
+          content: `Creating escrow — lock **${escrow.amount} XLM** for \`${escrow.destination.slice(0, 6)}…${escrow.destination.slice(-6)}\`.\n\nApprove in your wallet when prompted.`,
+        });
+
+        try {
+          const result = await createEscrow(
+            wallet.address,
+            escrow.destination,
+            escrow.amount,
+            wallet.signTransaction
+          );
+          await wallet.refreshBalance(wallet.address);
+          patchMessage(pendingId, {
+            content: `Escrow created${result.escrowId ? ` — **#${result.escrowId}**` : ""}. Funds are locked.\n\nRelease with \`escrow release ${result.escrowId ?? "<id>"}\` or refund with \`escrow refund ${result.escrowId ?? "<id>"}\`.`,
+            status: "success",
+            txHash: result.hash,
+            explorerUrl: result.explorerUrl,
+            amount: escrow.amount,
+            destination: escrow.destination,
+          });
+        } catch (error) {
+          patchMessage(pendingId, {
+            content: formatWalletError(error),
+            status: "error",
+          });
+        }
+        return;
+      }
+
+      if (escrow.action === "release" || escrow.action === "refund") {
+        const verb = escrow.action === "release" ? "Releasing" : "Refunding";
+        const pendingId = pushPendingMessage({
+          role: "bot",
+          content: `${verb} escrow **#${escrow.id}**…\n\nApprove in your wallet when prompted.`,
+        });
+
+        try {
+          const result =
+            escrow.action === "release"
+              ? await releaseEscrow(wallet.address, escrow.id, wallet.signTransaction)
+              : await refundEscrow(wallet.address, escrow.id, wallet.signTransaction);
+
+          await wallet.refreshBalance(wallet.address);
+          patchMessage(pendingId, {
+            content:
+              escrow.action === "release"
+                ? `Escrow **#${escrow.id}** released. Recipient paid and payment-log updated (inter-contract).`
+                : `Escrow **#${escrow.id}** refunded. Funds returned to you.`,
+            status: "success",
+            txHash: result.hash,
+            explorerUrl: result.explorerUrl,
+          });
+        } catch (error) {
+          patchMessage(pendingId, {
+            content: formatWalletError(error),
+            status: "error",
+          });
+        }
+        return;
+      }
     }
 
     if (command === "activity") {

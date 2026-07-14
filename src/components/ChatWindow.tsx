@@ -1,5 +1,9 @@
-import { useEffect, useRef } from "react";
-import type { ChatMessage } from "../lib/chat";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  getCommandSuggestions,
+  shouldFillSuggestionOnly,
+  type ChatMessage,
+} from "../lib/chat";
 import { ChatMessageList, TypingIndicator } from "./ChatMessageList";
 import { SuggestionLinks } from "./SuggestionLinks";
 
@@ -42,9 +46,21 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [activeSuggestion, setActiveSuggestion] = useState(0);
 
   const userMessageCount = messages.filter((m) => m.role === "user").length;
   const isHeroMode = userMessageCount === 0;
+  const hasPendingBot = messages.some((m) => m.role === "bot" && m.status === "pending");
+  const showTyping = isProcessing && !hasPendingBot;
+
+  const suggestions = useMemo(
+    () => (isConnected && !isProcessing ? getCommandSuggestions(input) : []),
+    [input, isConnected, isProcessing]
+  );
+
+  useEffect(() => {
+    setActiveSuggestion(0);
+  }, [input]);
 
   useEffect(() => {
     if (!isHeroMode) {
@@ -56,22 +72,82 @@ export function ChatWindow({
     if (isConnected) inputRef.current?.focus();
   }, [isConnected]);
 
+  const applySuggestion = (command: string) => {
+    if (shouldFillSuggestionOnly(command)) {
+      onInputChange(command.replace(/\.\.\.$/, ""));
+      inputRef.current?.focus();
+      return;
+    }
+    onQuickCommand(command);
+  };
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!input.trim() || isProcessing || !isConnected) return;
     onSubmit();
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!suggestions.length) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveSuggestion((prev) => (prev + 1) % suggestions.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveSuggestion((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+      return;
+    }
+
+    if (event.key === "Tab") {
+      event.preventDefault();
+      applySuggestion(suggestions[activeSuggestion]?.command ?? suggestions[0].command);
+    }
+  };
+
   const inputDisabled = !isConnected || isProcessing;
+
+  const renderAutocomplete = () => {
+    if (!suggestions.length) return null;
+
+    return (
+      <ul className="command-autocomplete" role="listbox" aria-label="Command suggestions">
+        {suggestions.map((item, index) => (
+          <li key={item.command}>
+            <button
+              type="button"
+              role="option"
+              aria-selected={index === activeSuggestion}
+              className={`command-autocomplete-item ${
+                index === activeSuggestion ? "command-autocomplete-item-active" : ""
+              }`}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                applySuggestion(item.command);
+              }}
+            >
+              <span className="command-autocomplete-command">{item.command}</span>
+              <span className="command-autocomplete-label">{item.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    );
+  };
 
   const renderInput = (variant: "hero" | "chat") => (
     <form onSubmit={handleSubmit} className={variant === "hero" ? "hero-input-form" : "chat-input-form"}>
+      {variant === "chat" && renderAutocomplete()}
       <div className={`input-pill ${variant === "hero" ? "input-pill-hero" : "input-pill-chat"}`}>
         <input
           ref={inputRef}
           type="text"
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder={isConnected ? "Ask me anything…" : "Connect wallet to begin"}
           disabled={inputDisabled}
           className="input-pill-field"
@@ -87,6 +163,7 @@ export function ChatWindow({
           <SendIcon />
         </button>
       </div>
+      {variant === "hero" && renderAutocomplete()}
     </form>
   );
 
@@ -173,7 +250,9 @@ export function ChatWindow({
 
           {renderInput("hero")}
 
-          <SuggestionLinks disabled={isProcessing} onSelect={onQuickCommand} variant="hero" />
+          {!suggestions.length && (
+            <SuggestionLinks disabled={isProcessing} onSelect={onQuickCommand} variant="hero" />
+          )}
 
           <div className="hero-sections">
             <section className="hero-section">
@@ -194,7 +273,8 @@ export function ChatWindow({
               </h2>
               <p className="hero-section-copy">
                 Swap with <code className="code-inline">swap 10 xlm to usdc</code>, check{" "}
-                <code className="code-inline">activity</code>, or type <code className="code-inline">help</code>.
+                <code className="code-inline">activity</code>, or type{" "}
+                <code className="code-inline">help</code>.
               </p>
             </section>
           </div>
@@ -206,9 +286,9 @@ export function ChatWindow({
   return (
     <main className={`chat-shell chat-shell-active ${className}`}>
       <div className="chat-messages scrollbar-thin">
-        <ChatMessageList messages={messages} />
+        <ChatMessageList messages={messages} onAction={onQuickCommand} />
 
-        {isProcessing && <TypingIndicator />}
+        {showTyping && <TypingIndicator />}
 
         <div ref={bottomRef} />
       </div>
@@ -223,7 +303,11 @@ export function ChatWindow({
 function WalletSectionIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9A2.5 2.5 0 0118.5 19h-13A2.5 2.5 0 013 16.5v-9z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 7.5A2.5 2.5 0 015.5 5h13A2.5 2.5 0 0121 7.5v9A2.5 2.5 0 0118.5 19h-13A2.5 2.5 0 013 16.5v-9z"
+      />
       <path strokeLinecap="round" d="M16 12.5h.01" />
     </svg>
   );

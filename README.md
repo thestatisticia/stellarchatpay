@@ -21,7 +21,7 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 - **Real-time feed** — `activity` command + live event polling in chat
 - **Error handling** — wallet not found, user rejected, insufficient balance
 
-## Level 3 — Orange Belt (in progress — localhost)
+## Level 3 — Orange Belt (complete)
 
 - **Escrow smart contract** — lock / release / refund native XLM
 - **Inter-contract calls** — `escrow.release` invokes `payment-log.log_payment`
@@ -166,7 +166,7 @@ npm run preview
 
 1. Push to GitHub
 2. Import on [Vercel](https://vercel.com)
-3. Set `VITE_CONTRACT_ID` environment variable after deploying the contract
+3. Set `VITE_CONTRACT_ID` and `VITE_ESCROW_CONTRACT_ID` after deploying the contracts
 
 ## Contract (Yellow Belt)
 
@@ -178,6 +178,16 @@ npm run preview
 | **Network** | Stellar Testnet |
 
 Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` in Vercel and redeploy.
+
+## Escrow contract (Orange Belt)
+
+| Field | Value |
+|-------|-------|
+| **Contract ID** | `CBFJ5LRLAQRFVASKEAKOTS4HTKQ2AGTLZOEUP75ER7HWMF6PUFR5Q46S` |
+| **Linked payment-log** | `CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` |
+| **Network** | Stellar Testnet |
+
+Set `VITE_ESCROW_CONTRACT_ID=CBFJ5LRLAQRFVASKEAKOTS4HTKQ2AGTLZOEUP75ER7HWMF6PUFR5Q46S` in Vercel (with `VITE_CONTRACT_ID`) and redeploy.
 
 ## Screenshots
 
@@ -213,6 +223,18 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 
 ![Mobile balance success](screenshots/mobile-balance-success.png)
 
+### CI pipeline green (GitHub Actions)
+
+![CI pipeline green](screenshots/ci-pipeline-green.png)
+
+### Frontend tests (`npm test`)
+
+![Frontend tests](screenshots/frontend-tests.png)
+
+### Contract tests (`npm run contract:test`)
+
+![Contract tests](screenshots/contract-tests.png)
+
 ## Submission Checklist
 
 ### White Belt — complete
@@ -241,10 +263,10 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 - [x] Contract tests (`cargo test`) — 3+
 - [x] Frontend tests (`npm test`) — 3+
 - [x] CI/CD workflow (GitHub Actions)
-- [ ] Escrow deployed on testnet + `VITE_ESCROW_CONTRACT_ID` on Vercel
+- [x] Escrow deployed on testnet + `VITE_ESCROW_CONTRACT_ID` on Vercel
 - [x] Screenshot: mobile responsive UI (wallet connected + balance via chat)
-- [ ] Screenshot: CI pipeline green (after this push)
-- [ ] Screenshot: test output with 3+ passing tests
+- [x] Screenshot: CI pipeline green
+- [x] Screenshot: test output with 3+ passing tests (frontend + contracts)
 - [ ] Demo video (1–2 minutes)
 
 ## License

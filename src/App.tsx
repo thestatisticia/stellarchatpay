@@ -42,7 +42,6 @@ import {
   fetchAccountBalance,
   fetchAssetBalance,
   fetchXlmBalance,
-  formatSwapQuoteMessage,
   fundTestnetAccount,
   getAccountExplorerUrl,
   getSwapQuote,
@@ -166,29 +165,34 @@ function App() {
       }
 
       if (escrow.action === "status") {
-        addMessage({
+        const pendingId = pushPendingMessage({
           role: "bot",
           content: `Looking up escrow **#${escrow.id}**…`,
-          status: "pending",
         });
         try {
           const entry = await getEscrow(escrow.id);
           if (!entry) {
-            addMessage({
-              role: "bot",
+            patchMessage(pendingId, {
               content: `Escrow **#${escrow.id}** was not found.`,
               status: "error",
             });
             return;
           }
-          addMessage({
-            role: "bot",
-            content: `**Escrow #${entry.id}** — **${entry.status}**\n\n• Amount: **${entry.amount} XLM**\n• From: \`${entry.from.slice(0, 6)}…${entry.from.slice(-6)}\`\n• To: \`${entry.to.slice(0, 6)}…${entry.to.slice(-6)}\``,
+          patchMessage(pendingId, {
+            content: `Escrow **#${entry.id}** details.`,
             status: "success",
+            card: {
+              kind: "escrow",
+              action: "status",
+              id: entry.id,
+              amount: entry.amount,
+              destination: entry.to,
+              from: entry.from,
+              escrowStatus: entry.status,
+            },
           });
         } catch (error) {
-          addMessage({
-            role: "bot",
+          patchMessage(pendingId, {
             content: formatWalletError(error),
             status: "error",
           });
@@ -236,10 +240,19 @@ function App() {
 
         const pendingId = pushPendingMessage({
           role: "bot",
-          content: `Creating escrow — lock **${escrow.amount} XLM** for \`${escrow.destination.slice(0, 6)}…${escrow.destination.slice(-6)}\`.\n\nApprove in your wallet when prompted.`,
+          content: "Preparing escrow… Contacting Horizon.",
+          card: {
+            kind: "escrow",
+            action: "create",
+            amount: escrow.amount,
+            destination: escrow.destination,
+          },
         });
 
         try {
+          patchMessage(pendingId, {
+            content: "Waiting for wallet approval to lock funds…",
+          });
           const result = await createEscrow(
             wallet.address,
             escrow.destination,
@@ -248,30 +261,47 @@ function App() {
           );
           await wallet.refreshBalance(wallet.address);
           patchMessage(pendingId, {
-            content: `Escrow created${result.escrowId ? ` — **#${result.escrowId}**` : ""}. Funds are locked.\n\nRelease with \`escrow release ${result.escrowId ?? "<id>"}\` or refund with \`escrow refund ${result.escrowId ?? "<id>"}\`.`,
+            content: `Funds locked.${result.escrowId ? ` Release with \`escrow release ${result.escrowId}\` or refund with \`escrow refund ${result.escrowId}\`.` : ""}`,
             status: "success",
             txHash: result.hash,
             explorerUrl: result.explorerUrl,
             amount: escrow.amount,
             destination: escrow.destination,
+            card: {
+              kind: "escrow",
+              action: "create",
+              id: result.escrowId,
+              amount: escrow.amount,
+              destination: escrow.destination,
+              escrowStatus: "Open",
+            },
           });
         } catch (error) {
           patchMessage(pendingId, {
             content: formatWalletError(error),
             status: "error",
+            card: undefined,
           });
         }
         return;
       }
 
       if (escrow.action === "release" || escrow.action === "refund") {
-        const verb = escrow.action === "release" ? "Releasing" : "Refunding";
+        const verb = escrow.action === "release" ? "release" : "refund";
         const pendingId = pushPendingMessage({
           role: "bot",
-          content: `${verb} escrow **#${escrow.id}**…\n\nApprove in your wallet when prompted.`,
+          content: `Preparing escrow ${verb}… Contacting Horizon.`,
+          card: {
+            kind: "escrow",
+            action: escrow.action,
+            id: escrow.id,
+          },
         });
 
         try {
+          patchMessage(pendingId, {
+            content: `Waiting for wallet approval to ${verb} escrow **#${escrow.id}**…`,
+          });
           const result =
             escrow.action === "release"
               ? await releaseEscrow(wallet.address, escrow.id, wallet.signTransaction)
@@ -281,16 +311,23 @@ function App() {
           patchMessage(pendingId, {
             content:
               escrow.action === "release"
-                ? `Escrow **#${escrow.id}** released. Recipient paid and payment-log updated (inter-contract).`
-                : `Escrow **#${escrow.id}** refunded. Funds returned to you.`,
+                ? "Recipient paid and payment-log updated (inter-contract)."
+                : "Funds returned to your wallet.",
             status: "success",
             txHash: result.hash,
             explorerUrl: result.explorerUrl,
+            card: {
+              kind: "escrow",
+              action: escrow.action,
+              id: escrow.id,
+              escrowStatus: escrow.action === "release" ? "Released" : "Refunded",
+            },
           });
         } catch (error) {
           patchMessage(pendingId, {
             content: formatWalletError(error),
             status: "error",
+            card: undefined,
           });
         }
         return;
@@ -343,19 +380,32 @@ function App() {
 
     if (command === "balance usdc") {
       if (!wallet.address) return;
+      const pendingId = pushPendingMessage({
+        role: "bot",
+        content: "Checking USDC balance…",
+      });
       try {
         const balance = await fetchAssetBalance(wallet.address, "usdc");
         const trusted = await hasUsdcTrustline(wallet.address);
-        addMessage({
-          role: "bot",
-          content: trusted
-            ? `You've got **${balance} USDC** on testnet.`
-            : `No USDC yet. Your first \`swap … to usdc\` adds a trustline automatically.`,
-          status: trusted ? "success" : "info",
+        if (!trusted) {
+          patchMessage(pendingId, {
+            content: "No USDC yet. Your first `swap … to usdc` adds a trustline automatically.",
+            status: "info",
+          });
+          return;
+        }
+        patchMessage(pendingId, {
+          content: "USDC balance on testnet.",
+          status: "success",
+          card: {
+            kind: "balance",
+            asset: "USDC",
+            balance,
+            address: wallet.address,
+          },
         });
       } catch (error) {
-        addMessage({
-          role: "bot",
+        patchMessage(pendingId, {
           content: formatWalletError(error),
           status: "error",
         });
@@ -416,10 +466,20 @@ function App() {
 
       const pendingId = pushPendingMessage({
         role: "bot",
-        content: `Executing swap — **${quote.sendAmount} ${quote.fromLabel}** → **≈ ${quote.receiveAmount} ${quote.toLabel}**.\n\nApprove in your wallet when prompted.`,
+        content: "Preparing swap… Contacting Horizon.",
+        card: {
+          kind: "swapResult",
+          sendAmount: quote.sendAmount,
+          receiveAmount: quote.receiveAmount,
+          fromLabel: quote.fromLabel,
+          toLabel: quote.toLabel,
+        },
       });
 
       try {
+        patchMessage(pendingId, {
+          content: "Waiting for wallet approval to execute the swap…",
+        });
         const result = await executeSwap(
           wallet.address,
           quote,
@@ -430,16 +490,23 @@ function App() {
         await wallet.refreshBalance(wallet.address);
 
         patchMessage(pendingId, {
-          content: `Swap complete — sent **${result.sendAmount} ${result.fromAsset}**, received **${result.receiveAmount} ${result.toAsset}**.`,
+          content: "Swap settled on testnet.",
           status: "success",
           txHash: result.hash,
           explorerUrl: result.explorerUrl,
-          amount: result.receiveAmount,
+          card: {
+            kind: "swapResult",
+            sendAmount: result.sendAmount,
+            receiveAmount: result.receiveAmount,
+            fromLabel: result.fromAsset,
+            toLabel: result.toAsset,
+          },
         });
       } catch (error) {
         patchMessage(pendingId, {
           content: formatWalletError(error),
           status: "error",
+          card: undefined,
         });
       }
       return;
@@ -477,7 +544,7 @@ function App() {
 
       const quotePendingId = pushPendingMessage({
         role: "bot",
-        content: "Fetching swap quote from the testnet DEX…",
+        content: "Contacting Horizon for a DEX path…",
       });
 
       try {
@@ -491,8 +558,19 @@ function App() {
         pendingSwap.current = quote;
 
         patchMessage(quotePendingId, {
-          content: formatSwapQuoteMessage(quote),
+          content: "Review the quote, then confirm.",
           status: "info",
+          card: {
+            kind: "swapQuote",
+            sendAmount: quote.sendAmount,
+            receiveAmount: quote.receiveAmount,
+            fromLabel: quote.fromLabel,
+            toLabel: quote.toLabel,
+            rate: quote.rate,
+            needsTrustline: quote.needsTrustline,
+          },
+          actionCommand: "confirm",
+          actionLabel: "Confirm swap",
         });
       } catch (error) {
         pendingSwap.current = null;
@@ -506,16 +584,24 @@ function App() {
 
     if (command === "balance") {
       if (!wallet.address) return;
+      const pendingId = pushPendingMessage({
+        role: "bot",
+        content: "Checking balance on Horizon…",
+      });
       try {
         const { balance } = await wallet.refreshBalance(wallet.address);
-        addMessage({
-          role: "bot",
-          content: `You've got **${balance} XLM** on testnet.`,
+        patchMessage(pendingId, {
+          content: "Your XLM balance on testnet.",
           status: "success",
+          card: {
+            kind: "balance",
+            asset: "XLM",
+            balance,
+            address: wallet.address,
+          },
         });
       } catch (error) {
-        addMessage({
-          role: "bot",
+        patchMessage(pendingId, {
           content: formatWalletError(error),
           status: "error",
         });
@@ -534,31 +620,35 @@ function App() {
         return;
       }
 
+      const pendingId = pushPendingMessage({
+        role: "bot",
+        content: "Looking up account on Horizon…",
+      });
+
       try {
         const { balance, exists } = await fetchAccountBalance(otherAddress);
-        const short = `${otherAddress.slice(0, 8)}…${otherAddress.slice(-6)}`;
 
         if (!exists) {
-          addMessage({
-            role: "bot",
-            content: `Account \`${short}\` was not found on testnet. It may be unfunded or the address is wrong.`,
+          patchMessage(pendingId, {
+            content: `Account \`${otherAddress.slice(0, 8)}…${otherAddress.slice(-6)}\` was not found on testnet. It may be unfunded or the address is wrong.`,
             status: "error",
           });
           return;
         }
 
-        const isOwnWallet = wallet.address === otherAddress;
-        addMessage({
-          role: "bot",
-          content: isOwnWallet
-            ? `Your balance is **${balance} XLM** on testnet.`
-            : `Balance for \`${short}\` is **${balance} XLM** on testnet.`,
+        patchMessage(pendingId, {
+          content: wallet.address === otherAddress ? "Your XLM balance on testnet." : "Account balance on testnet.",
           status: "success",
           explorerUrl: getAccountExplorerUrl(otherAddress),
+          card: {
+            kind: "balance",
+            asset: "XLM",
+            balance,
+            address: otherAddress,
+          },
         });
       } catch (error) {
-        addMessage({
-          role: "bot",
+        patchMessage(pendingId, {
           content: formatWalletError(error),
           status: "error",
         });
@@ -691,10 +781,18 @@ function App() {
 
       const paymentPendingId = pushPendingMessage({
         role: "bot",
-        content: `Sending **${payment.amount} XLM** → \`${payment.destination.slice(0, 6)}…${payment.destination.slice(-6)}\`\n\nApprove in your wallet when prompted.`,
+        content: "Preparing payment… Contacting Horizon.",
+        card: {
+          kind: "payment",
+          amount: payment.amount,
+          destination: payment.destination,
+        },
       });
 
       try {
+        patchMessage(paymentPendingId, {
+          content: "Waiting for wallet approval to send payment…",
+        });
         const result = await sendXlmPayment(
           wallet.address,
           payment.destination,
@@ -712,17 +810,27 @@ function App() {
             explorerUrl: result.explorerUrl,
             amount: payment.amount,
             destination: payment.destination,
+            card: {
+              kind: "payment",
+              amount: payment.amount,
+              destination: payment.destination,
+            },
           });
           return;
         }
 
         patchMessage(paymentPendingId, {
-          content: "Payment sent. Logging to Soroban contract — approve if prompted.",
+          content: "Payment sent. Logging to Soroban — approve if prompted.",
           status: "pending",
           txHash: result.hash,
           explorerUrl: result.explorerUrl,
           amount: payment.amount,
           destination: payment.destination,
+          card: {
+            kind: "payment",
+            amount: payment.amount,
+            destination: payment.destination,
+          },
         });
 
         try {
@@ -743,6 +851,11 @@ function App() {
             contractExplorerUrl: contractTx.explorerUrl,
             amount: payment.amount,
             destination: payment.destination,
+            card: {
+              kind: "payment",
+              amount: payment.amount,
+              destination: payment.destination,
+            },
           });
         } catch (error) {
           patchMessage(paymentPendingId, {
@@ -752,12 +865,18 @@ function App() {
             explorerUrl: result.explorerUrl,
             amount: payment.amount,
             destination: payment.destination,
+            card: {
+              kind: "payment",
+              amount: payment.amount,
+              destination: payment.destination,
+            },
           });
         }
       } catch (error) {
         patchMessage(paymentPendingId, {
           content: formatWalletError(error),
           status: "error",
+          card: undefined,
         });
       }
       return;

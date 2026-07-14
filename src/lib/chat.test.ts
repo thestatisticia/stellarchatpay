@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   explainEscrowCommandFailure,
+  getCommandSuggestions,
   parseEscrowCommand,
   parseSendCommand,
   parseSwapCommand,
+  shouldFillSuggestionOnly,
 } from "../lib/chat";
 import { AppWalletError, formatWalletError } from "../lib/errors";
 
@@ -82,5 +84,17 @@ describe("formatWalletError", () => {
     expect(formatWalletError({ message: "User rejected the request" })).toContain(
       "rejected the request"
     );
+  });
+});
+
+describe("getCommandSuggestions", () => {
+  it("suggests swap commands while typing swap", () => {
+    const suggestions = getCommandSuggestions("swap");
+    expect(suggestions.some((s) => s.command.startsWith("swap"))).toBe(true);
+  });
+
+  it("marks incomplete address templates as fill-only", () => {
+    expect(shouldFillSuggestionOnly("send 10 to G...")).toBe(true);
+    expect(shouldFillSuggestionOnly("balance")).toBe(false);
   });
 });

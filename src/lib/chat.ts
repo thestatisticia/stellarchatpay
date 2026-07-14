@@ -2,6 +2,46 @@ export type MessageRole = "user" | "bot" | "system";
 
 export type MessageStatus = "info" | "success" | "error" | "pending";
 
+/** Structured card payload rendered under a bot message. */
+export type MessageCard =
+  | {
+      kind: "balance";
+      asset: string;
+      balance: string;
+      address?: string;
+    }
+  | {
+      kind: "payment";
+      amount: string;
+      destination: string;
+      asset?: string;
+    }
+  | {
+      kind: "escrow";
+      action: "create" | "release" | "refund" | "status";
+      id?: number;
+      amount?: string;
+      destination?: string;
+      from?: string;
+      escrowStatus?: string;
+    }
+  | {
+      kind: "swapQuote";
+      sendAmount: string;
+      receiveAmount: string;
+      fromLabel: string;
+      toLabel: string;
+      rate: string;
+      needsTrustline: boolean;
+    }
+  | {
+      kind: "swapResult";
+      sendAmount: string;
+      receiveAmount: string;
+      fromLabel: string;
+      toLabel: string;
+    };
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -15,6 +55,10 @@ export interface ChatMessage {
   contractExplorerUrl?: string;
   amount?: string;
   destination?: string;
+  card?: MessageCard;
+  /** Optional chat action (e.g. confirm swap). */
+  actionCommand?: string;
+  actionLabel?: string;
 }
 
 export interface ParsedSendCommand {
@@ -261,6 +305,57 @@ export function createMessage(
     id: crypto.randomUUID(),
     timestamp: new Date(),
   };
+}
+
+export const COMMAND_SUGGESTIONS = [
+  { label: "Check my XLM balance", command: "balance" },
+  { label: "Check USDC balance", command: "balance usdc" },
+  { label: "Fund my wallet", command: "fund" },
+  { label: "Swap 10 XLM to USDC", command: "swap 10 xlm to usdc" },
+  { label: "Swap 1 USDC to XLM", command: "swap 1 usdc to xlm" },
+  { label: "Confirm pending swap", command: "confirm" },
+  { label: "Show on-chain activity", command: "activity" },
+  { label: "Send 10 XLM", command: "send 10 to G..." },
+  { label: "Lock 10 XLM in escrow", command: "escrow 10 to G..." },
+  { label: "Release escrow #1", command: "escrow release 1" },
+  { label: "Refund escrow #1", command: "escrow refund 1" },
+  { label: "Escrow status #1", command: "escrow status 1" },
+  { label: "What commands can I use?", command: "help" },
+] as const;
+
+/** Autocomplete candidates while the user types a command. */
+export function getCommandSuggestions(
+  input: string,
+  limit = 5
+): { label: string; command: string }[] {
+  const q = input.trim().toLowerCase();
+  if (!q) return [];
+
+  const scored = COMMAND_SUGGESTIONS.map((item) => {
+    const command = item.command.toLowerCase();
+    const label = item.label.toLowerCase();
+    let score = 0;
+    if (command === q) score = 100;
+    else if (command.startsWith(q)) score = 80;
+    else if (command.includes(q)) score = 50;
+    else if (label.includes(q)) score = 30;
+    else if (q.split(/\s+/).every((part) => command.includes(part) || label.includes(part))) {
+      score = 20;
+    }
+    return { item, score };
+  })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return scored.slice(0, limit).map((entry) => ({
+    label: entry.item.label,
+    command: entry.item.command,
+  }));
+}
+
+/** Incomplete templates should fill the input; complete commands can submit. */
+export function shouldFillSuggestionOnly(command: string): boolean {
+  return /G\.\.\.|<\w+>|\.\.\./i.test(command);
 }
 
 export const WELCOME_MESSAGE = `Hey — I'm your Stellar payment assistant on **testnet**.

@@ -4,6 +4,7 @@ import { ChatBubble } from "./ChatBubble";
 
 interface ChatMessageListProps {
   messages: ChatMessage[];
+  onAction?: (command: string) => void;
 }
 
 type MessageBlock =
@@ -43,18 +44,32 @@ function buildBlocks(messages: ChatMessage[]): MessageBlock[] {
   return blocks;
 }
 
-export function ChatMessageList({ messages }: ChatMessageListProps) {
+export function ChatMessageList({ messages, onAction }: ChatMessageListProps) {
   const blocks = buildBlocks(messages);
 
   return (
     <>
       {blocks.map((block, blockIndex) => {
         if (block.kind === "system") {
-          return <ChatBubble key={block.message.id} message={block.message} index={blockIndex} />;
+          return (
+            <ChatBubble
+              key={block.message.id}
+              message={block.message}
+              index={blockIndex}
+              onAction={onAction}
+            />
+          );
         }
 
         if (block.kind === "standalone") {
-          return <ChatBubble key={block.message.id} message={block.message} index={blockIndex} />;
+          return (
+            <ChatBubble
+              key={block.message.id}
+              message={block.message}
+              index={blockIndex}
+              onAction={onAction}
+            />
+          );
         }
 
         return (
@@ -67,6 +82,7 @@ export function ChatMessageList({ messages }: ChatMessageListProps) {
                 index={blockIndex + replyIndex}
                 variant="turn-bot"
                 showAvatar={replyIndex === 0}
+                onAction={onAction}
               />
             ))}
           </div>
@@ -91,7 +107,7 @@ export function TypingIndicator({ showAvatar = true }: TypingIndicatorProps) {
             <span />
             <span />
           </span>
-          Processing…
+          Preparing…
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { BotAvatar } from "./BotAvatar";
-import type { ChatMessage } from "../lib/chat";
+import type { ChatMessage, MessageCard } from "../lib/chat";
 import { truncateAddress } from "../lib/stellar";
 
 interface ChatBubbleProps {
@@ -7,6 +7,7 @@ interface ChatBubbleProps {
   index: number;
   variant?: "default" | "turn-user" | "turn-bot";
   showAvatar?: boolean;
+  onAction?: (command: string) => void;
 }
 
 function shortenLongTokens(text: string): string {
@@ -37,97 +38,6 @@ function formatContent(content: string): React.ReactNode {
   });
 }
 
-function TransactionCard({
-  amount,
-  destination,
-  hash,
-  explorerUrl,
-  contractTxHash,
-  contractExplorerUrl,
-  status,
-}: {
-  amount?: string;
-  destination?: string;
-  hash?: string;
-  explorerUrl?: string;
-  contractTxHash?: string;
-  contractExplorerUrl?: string;
-  status: ChatMessage["status"];
-}) {
-  if (!hash || (status !== "success" && status !== "pending")) return null;
-  if (status === "pending" && !amount) return null;
-
-  return (
-    <div className="tx-card mt-3 overflow-hidden rounded-lg">
-      <div className="tx-card-header px-3 py-2">
-        <p className="text-[10px] font-medium uppercase tracking-wider">
-          {status === "pending" ? "Payment in progress" : "Payment confirmed"}
-        </p>
-      </div>
-      <div className="space-y-2 px-3 py-2.5 text-xs">
-        {amount && (
-          <div className="tx-row">
-            <span style={{ color: "var(--text-muted)" }}>Amount</span>
-            <span className="font-medium tabular-nums" style={{ color: "var(--text)" }}>
-              {amount} XLM
-            </span>
-          </div>
-        )}
-        {destination && (
-          <div className="tx-row">
-            <span className="shrink-0" style={{ color: "var(--text-muted)" }}>
-              Recipient
-            </span>
-            <span className="tx-mono" title={destination}>
-              {truncateAddress(destination, 6)}
-            </span>
-          </div>
-        )}
-        <div className="tx-row">
-          <span style={{ color: "var(--text-muted)" }}>Payment</span>
-          <span className="tx-mono" title={hash}>
-            {hash.slice(0, 8)}…{hash.slice(-8)}
-          </span>
-        </div>
-        {contractTxHash && (
-          <div className="tx-row">
-            <span style={{ color: "var(--text-muted)" }}>Contract log</span>
-            <span className="tx-mono" title={contractTxHash}>
-              {contractTxHash.slice(0, 8)}…{contractTxHash.slice(-8)}
-            </span>
-          </div>
-        )}
-      </div>
-      {(explorerUrl || contractExplorerUrl) && status === "success" && (
-        <div className="tx-card-links">
-          {explorerUrl && (
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tx-card-link"
-            >
-              View payment
-              <ExternalIcon />
-            </a>
-          )}
-          {contractExplorerUrl && (
-            <a
-              href={contractExplorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tx-card-link"
-            >
-              View contract log
-              <ExternalIcon />
-            </a>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function ExternalIcon() {
   return (
     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
@@ -139,6 +49,332 @@ function ExternalIcon() {
       />
     </svg>
   );
+}
+
+function CardLinks({
+  explorerUrl,
+  contractExplorerUrl,
+  status,
+}: {
+  explorerUrl?: string;
+  contractExplorerUrl?: string;
+  status: ChatMessage["status"];
+}) {
+  if (status !== "success" || (!explorerUrl && !contractExplorerUrl)) return null;
+
+  return (
+    <div className="tx-card-links">
+      {explorerUrl && (
+        <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="tx-card-link">
+          View on explorer
+          <ExternalIcon />
+        </a>
+      )}
+      {contractExplorerUrl && (
+        <a
+          href={contractExplorerUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="tx-card-link"
+        >
+          View contract log
+          <ExternalIcon />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function ResultCard({
+  message,
+  onAction,
+}: {
+  message: ChatMessage;
+  onAction?: (command: string) => void;
+}) {
+  const status = message.status;
+  const card = message.card ?? inferLegacyPaymentCard(message);
+
+  if (!card) {
+    if (message.txHash && (status === "success" || status === "pending")) {
+      return (
+        <div className={`result-card mt-3 ${status === "pending" ? "result-card-pending" : ""}`}>
+          <div className="result-card-header">
+            <p className="result-card-kicker">
+              {status === "pending" ? "Transaction in progress" : "Transaction confirmed"}
+            </p>
+          </div>
+          <div className="result-card-body">
+            <div className="tx-row">
+              <span className="result-card-label">Hash</span>
+              <span className="tx-mono" title={message.txHash}>
+                {message.txHash.slice(0, 8)}…{message.txHash.slice(-8)}
+              </span>
+            </div>
+          </div>
+          <CardLinks
+            explorerUrl={message.explorerUrl}
+            contractExplorerUrl={message.contractExplorerUrl}
+            status={status}
+          />
+        </div>
+      );
+    }
+    return null;
+  }
+
+  const pending = status === "pending";
+  const toneClass = pending ? "result-card-pending" : "";
+
+  if (card.kind === "balance") {
+    return (
+      <div className={`result-card mt-3 ${toneClass}`}>
+        <div className="result-card-header">
+          <p className="result-card-kicker">Wallet balance</p>
+        </div>
+        <div className="result-card-body">
+          <div className="result-card-hero">
+            <span className="result-card-asset">{card.asset}</span>
+            <span className="result-card-balance tabular-nums">{formatCardBalance(card.balance)}</span>
+          </div>
+          {card.address && (
+            <div className="tx-row">
+              <span className="result-card-label">Account</span>
+              <span className="tx-mono" title={card.address}>
+                {truncateAddress(card.address, 6)}
+              </span>
+            </div>
+          )}
+          <div className="tx-row">
+            <span className="result-card-label">Updated</span>
+            <span className="result-card-meta">
+              {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
+        </div>
+        {message.explorerUrl && status === "success" && (
+          <div className="tx-card-links">
+            <a
+              href={message.explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tx-card-link"
+            >
+              View account
+              <ExternalIcon />
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (card.kind === "swapQuote") {
+    return (
+      <div className={`result-card mt-3 ${toneClass}`}>
+        <div className="result-card-header">
+          <p className="result-card-kicker">Swap preview</p>
+        </div>
+        <div className="result-card-body">
+          <div className="result-card-swap-stack">
+            <p className="result-card-swap-line tabular-nums">
+              {card.sendAmount} {card.fromLabel}
+            </p>
+            <p className="result-card-swap-arrow" aria-hidden>
+              ↓
+            </p>
+            <p className="result-card-swap-line result-card-swap-receive tabular-nums">
+              ≈ {card.receiveAmount} {card.toLabel}
+            </p>
+          </div>
+          <div className="tx-row">
+            <span className="result-card-label">Rate</span>
+            <span className="result-card-meta tabular-nums">
+              ≈ {card.rate} {card.toLabel} / {card.fromLabel}
+            </span>
+          </div>
+          {card.needsTrustline && (
+            <p className="result-card-note">USDC trustline will be added in the same transaction.</p>
+          )}
+        </div>
+        {message.actionCommand && onAction && (
+          <div className="result-card-actions">
+            <button
+              type="button"
+              className="result-card-action-btn"
+              onClick={() => onAction(message.actionCommand!)}
+            >
+              {message.actionLabel ?? "Confirm"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (card.kind === "swapResult") {
+    return (
+      <div className={`result-card mt-3 ${toneClass}`}>
+        <div className="result-card-header">
+          <p className="result-card-kicker">{pending ? "Swap in progress" : "Swap confirmed"}</p>
+        </div>
+        <div className="result-card-body">
+          <div className="result-card-swap-stack">
+            <p className="result-card-swap-line tabular-nums">
+              {card.sendAmount} {card.fromLabel}
+            </p>
+            <p className="result-card-swap-arrow" aria-hidden>
+              ↓
+            </p>
+            <p className="result-card-swap-line result-card-swap-receive tabular-nums">
+              {card.receiveAmount} {card.toLabel}
+            </p>
+          </div>
+        </div>
+        <CardLinks explorerUrl={message.explorerUrl} status={status} />
+      </div>
+    );
+  }
+
+  if (card.kind === "escrow") {
+    const title =
+      card.action === "create"
+        ? pending
+          ? "Escrow locking"
+          : "Escrow created"
+        : card.action === "release"
+          ? pending
+            ? "Escrow releasing"
+            : "Escrow released"
+          : card.action === "refund"
+            ? pending
+              ? "Escrow refunding"
+              : "Escrow refunded"
+            : "Escrow status";
+
+    return (
+      <div className={`result-card mt-3 ${toneClass}`}>
+        <div className="result-card-header">
+          <p className="result-card-kicker">{title}</p>
+        </div>
+        <div className="result-card-body">
+          {card.id != null && (
+            <div className="tx-row">
+              <span className="result-card-label">Escrow</span>
+              <span className="font-medium" style={{ color: "var(--text)" }}>
+                #{card.id}
+              </span>
+            </div>
+          )}
+          {card.escrowStatus && (
+            <div className="tx-row">
+              <span className="result-card-label">Status</span>
+              <span className="font-medium" style={{ color: "var(--text)" }}>
+                {card.escrowStatus}
+              </span>
+            </div>
+          )}
+          {card.amount && (
+            <div className="tx-row">
+              <span className="result-card-label">Amount</span>
+              <span className="font-medium tabular-nums" style={{ color: "var(--text)" }}>
+                {card.amount} XLM
+              </span>
+            </div>
+          )}
+          {card.from && (
+            <div className="tx-row">
+              <span className="result-card-label">From</span>
+              <span className="tx-mono" title={card.from}>
+                {truncateAddress(card.from, 6)}
+              </span>
+            </div>
+          )}
+          {card.destination && (
+            <div className="tx-row">
+              <span className="result-card-label">Recipient</span>
+              <span className="tx-mono" title={card.destination}>
+                {truncateAddress(card.destination, 6)}
+              </span>
+            </div>
+          )}
+          {message.txHash && (
+            <div className="tx-row">
+              <span className="result-card-label">Tx</span>
+              <span className="tx-mono" title={message.txHash}>
+                {message.txHash.slice(0, 8)}…{message.txHash.slice(-8)}
+              </span>
+            </div>
+          )}
+        </div>
+        <CardLinks explorerUrl={message.explorerUrl} status={status} />
+      </div>
+    );
+  }
+
+  // payment
+  return (
+    <div className={`result-card mt-3 ${toneClass}`}>
+      <div className="result-card-header">
+        <p className="result-card-kicker">{pending ? "Payment in progress" : "Payment confirmed"}</p>
+      </div>
+      <div className="result-card-body">
+        <div className="tx-row">
+          <span className="result-card-label">Amount</span>
+          <span className="font-medium tabular-nums" style={{ color: "var(--text)" }}>
+            {card.amount} {card.asset ?? "XLM"}
+          </span>
+        </div>
+        <div className="tx-row">
+          <span className="result-card-label">Recipient</span>
+          <span className="tx-mono" title={card.destination}>
+            {truncateAddress(card.destination, 6)}
+          </span>
+        </div>
+        {message.txHash && (
+          <div className="tx-row">
+            <span className="result-card-label">Payment</span>
+            <span className="tx-mono" title={message.txHash}>
+              {message.txHash.slice(0, 8)}…{message.txHash.slice(-8)}
+            </span>
+          </div>
+        )}
+        {message.contractTxHash && (
+          <div className="tx-row">
+            <span className="result-card-label">Contract log</span>
+            <span className="tx-mono" title={message.contractTxHash}>
+              {message.contractTxHash.slice(0, 8)}…{message.contractTxHash.slice(-8)}
+            </span>
+          </div>
+        )}
+      </div>
+      <CardLinks
+        explorerUrl={message.explorerUrl}
+        contractExplorerUrl={message.contractExplorerUrl}
+        status={status}
+      />
+    </div>
+  );
+}
+
+function inferLegacyPaymentCard(message: ChatMessage): MessageCard | null {
+  if (!message.amount || !message.destination) return null;
+  if (message.status !== "success" && message.status !== "pending") return null;
+  if (message.status === "pending" && !message.txHash) return null;
+  return {
+    kind: "payment",
+    amount: message.amount,
+    destination: message.destination,
+  };
+}
+
+function formatCardBalance(balance: string): string {
+  const value = Number.parseFloat(balance);
+  if (Number.isNaN(value)) return balance;
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 7,
+  });
 }
 
 function StatusBadge({ status }: { status: ChatMessage["status"] }) {
@@ -169,6 +405,7 @@ export function ChatBubble({
   index,
   variant = "default",
   showAvatar = true,
+  onAction,
 }: ChatBubbleProps) {
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
@@ -184,19 +421,13 @@ export function ChatBubble({
   const bubble = (
     <div className={`chat-bubble ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
       {!isUser && <StatusBadge status={message.status} />}
-      <div className="chat-bubble-text">{formatContent(message.content)}</div>
+      {message.content.trim() && (
+        <div className="chat-bubble-text">{formatContent(message.content)}</div>
+      )}
 
-      <TransactionCard
-        amount={message.amount}
-        destination={message.destination}
-        hash={message.txHash}
-        explorerUrl={message.explorerUrl}
-        contractTxHash={message.contractTxHash}
-        contractExplorerUrl={message.contractExplorerUrl}
-        status={message.status}
-      />
+      {!isUser && <ResultCard message={message} onAction={onAction} />}
 
-      {message.explorerUrl && !message.txHash && message.status === "success" && (
+      {message.explorerUrl && !message.txHash && !message.card && message.status === "success" && (
         <a href={message.explorerUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block text-xs text-link">
           View account on Stellar Expert →
         </a>

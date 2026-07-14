@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  explainEscrowCommandFailure,
   parseEscrowCommand,
   parseSendCommand,
   parseSwapCommand,
@@ -48,6 +49,23 @@ describe("parseEscrowCommand", () => {
       action: "status",
       id: 1,
     });
+    expect(
+      parseEscrowCommand(`lock 100 xlm in the escrow for ${SAMPLE_ADDRESS}`)
+    ).toEqual({
+      action: "create",
+      amount: "100",
+      destination: SAMPLE_ADDRESS,
+    });
+  });
+
+  it("explains missing recipient on lock-in-escrow phrasing", () => {
+    const hint = explainEscrowCommandFailure("lock 100 xlm in the escrow");
+    expect(hint).toContain("recipient address");
+  });
+
+  it("explains truncated G... placeholder", () => {
+    const hint = explainEscrowCommandFailure("escrow 10 to G...");
+    expect(hint).toContain("truncated");
   });
 });
 

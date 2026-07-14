@@ -69,6 +69,7 @@ const CONFIRM_PATTERNS = [/^confirm(?:\s+swap)?$/i, /^yes$/i];
 const ESCROW_CREATE_PATTERNS = [
   /^escrow(?:\s+create)?\s+(\d+(?:\.\d+)?)\s*(?:xlm)?\s+(?:to|for)\s+(G[A-Z2-7]{55})$/i,
   /^lock\s+(\d+(?:\.\d+)?)\s*(?:xlm)?\s+(?:to|for)\s+(G[A-Z2-7]{55})$/i,
+  /^lock\s+(\d+(?:\.\d+)?)\s*(?:xlm)?\s+in\s+(?:the\s+)?escrow\s+(?:to|for)\s+(G[A-Z2-7]{55})$/i,
 ];
 
 const ESCROW_RELEASE_PATTERNS = [/^escrow\s+release\s+(\d+)$/i, /^release\s+escrow\s+(\d+)$/i];
@@ -160,6 +161,9 @@ const SEND_LIKE_PREFIX =
 
 const SWAP_LIKE_PREFIX = /^(?:swap|exchange)\s+/i;
 
+const ESCROW_LIKE_PREFIX =
+  /^(?:escrow|lock|release\s+escrow|refund\s+escrow)\b|\bin\s+(?:the\s+)?escrow\b/i;
+
 function extractAddressCandidate(input: string): string | null {
   const match = input.match(/\b(G[A-Z2-7]+)/i);
   return match ? match[1].toUpperCase() : null;
@@ -203,6 +207,50 @@ export function explainSwapCommandFailure(input: string): string | null {
   if (parseSwapCommand(trimmed)) return null;
 
   return "Couldn't parse that swap.\n\nUse:\n`swap 10 xlm to usdc`\n`swap 1 usdc to xlm`";
+}
+
+/** Helpful message when input looks like an escrow command but does not parse. */
+export function explainEscrowCommandFailure(input: string): string | null {
+  const trimmed = input.trim();
+  if (!ESCROW_LIKE_PREFIX.test(trimmed)) return null;
+  if (parseEscrowCommand(trimmed)) return null;
+
+  const address = extractAddressCandidate(trimmed);
+  const looksLikeCreate =
+    /^(?:escrow(?:\s+create)?|lock)\s+\d/i.test(trimmed) ||
+    /\block\s+\d/i.test(trimmed);
+
+  if (looksLikeCreate && (trimmed.includes("...") || trimmed.endsWith(".."))) {
+    return "Address looks truncated — don't use `...`. Paste the **full** 56-character Stellar address from your wallet.\n\nExample:\n`escrow 10 to GABCDEFGHIJKLMNOPQRSTUVWXYZ234567890123456789012345`";
+  }
+
+  if (looksLikeCreate && !address) {
+    return "Escrow needs a **recipient address** — who gets the funds when you release.\n\nTry:\n`escrow 10 to GABCDEF...` (full 56-character address)\n`lock 100 xlm to GABCDEF...`\n\n`lock 100 xlm in the escrow` alone isn't enough without **to G...**.";
+  }
+
+  if (address) {
+    if (trimmed.includes("...") || trimmed.endsWith("..")) {
+      return "Address looks truncated — don't use `...`. Paste the **full** 56-character Stellar address from your wallet.";
+    }
+
+    if (address.length < 56) {
+      return `Address is incomplete (**${address.length}/56** characters).\n\nEscrow example:\n\`escrow 10 to GABCDEFGHIJKLMNOPQRSTUVWXYZ234567890123456789012345\``;
+    }
+
+    if (address.length > 56) {
+      return "Address is too long. A Stellar public key is exactly **56 characters** (including the leading `G`).";
+    }
+
+    if (!/^G[A-Z2-7]{55}$/.test(address)) {
+      return "Invalid address characters. After `G`, use only **A–Z** and **2–7** (Stellar base32).";
+    }
+  }
+
+  if (/^escrow\s+(?:release|refund|status)\b/i.test(trimmed) && !/\d/.test(trimmed)) {
+    return "Missing escrow ID.\n\nTry:\n`escrow release 1`\n`escrow refund 1`\n`escrow status 1`";
+  }
+
+  return "Couldn't parse that escrow command.\n\n**Create** (lock XLM for someone):\n`escrow 10 to G...` — use the full address, not literally `G...`\n`lock 100 xlm to G...`\n\n**After creating:**\n`escrow release 1` · `escrow refund 1` · `escrow status 1`";
 }
 
 export function createMessage(

@@ -9,6 +9,7 @@ import {
   HELP_MESSAGE,
   WELCOME_MESSAGE,
   createMessage,
+  explainEscrowCommandFailure,
   explainSendCommandFailure,
   explainSwapCommandFailure,
   parseBalanceCommand,
@@ -774,9 +775,15 @@ function App() {
       return;
     }
 
+    const escrowHint = explainEscrowCommandFailure(rawInput);
+    if (escrowHint) {
+      addMessage({ role: "bot", content: escrowHint, status: "error" });
+      return;
+    }
+
     addMessage({
       role: "bot",
-      content: "Didn't catch that. Type `help` for all commands, or try:\n`send 10 to G...`\n`swap 10 xlm to usdc`",
+      content: "Didn't catch that. Type `help` for all commands, or try:\n`send 10 to G...`\n`swap 10 xlm to usdc`\n`escrow 10 to G...`",
       status: "info",
     });
   };

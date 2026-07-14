@@ -182,7 +182,7 @@ export function ChatBubble({
   }
 
   const bubble = (
-    <div className={`chat-bubble max-w-[min(92%,34rem)] ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
+    <div className={`chat-bubble ${isUser ? "chat-bubble-user" : "chat-bubble-bot"}`}>
       {!isUser && <StatusBadge status={message.status} />}
       <div className="chat-bubble-text">{formatContent(message.content)}</div>
 

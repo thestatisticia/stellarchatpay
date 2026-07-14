@@ -98,20 +98,23 @@ export function WalletHeader({
             <button
               type="button"
               onClick={onDisconnect}
-              className="header-wallet-pill hidden sm:inline-flex"
+              className="header-wallet-pill"
               title="Click to disconnect"
             >
               <span className="header-wallet-icon">
                 <WalletIcon />
               </span>
               <span className="header-wallet-address font-mono">
-                {truncateAddress(address, 5)}
+                {truncateAddress(address, 4)}
               </span>
               <span className="header-wallet-balance tabular-nums">
                 {isLoadingBalance ? (
                   <span className="header-wallet-stat-skeleton" />
                 ) : (
-                  `${formatBalance(balance)} XLM`
+                  <>
+                    <span className="header-wallet-balance-value">{formatBalance(balance)}</span>
+                    <span className="header-wallet-balance-unit"> XLM</span>
+                  </>
                 )}
               </span>
             </button>
@@ -127,27 +130,13 @@ export function WalletHeader({
               className="header-connect-btn"
             >
               <WalletIcon />
-              <span>{isConnecting ? "Connecting…" : "Connect Wallet"}</span>
+              <span className="header-connect-label">
+                {isConnecting ? "Connecting…" : "Connect Wallet"}
+              </span>
             </button>
           )}
         </div>
       </div>
-
-      {isConnected && address && (
-        <div className="header-mobile-bar sm:hidden">
-          <button type="button" onClick={onDisconnect} className="header-wallet-pill">
-            <span className="header-wallet-icon">
-              <WalletIcon />
-            </span>
-            <span className="header-wallet-address font-mono text-xs">
-              {truncateAddress(address, 5)}
-            </span>
-            <span className="header-wallet-balance text-sm tabular-nums">
-              {isLoadingBalance ? "…" : `${formatBalance(balance)} XLM`}
-            </span>
-          </button>
-        </div>
-      )}
     </header>
   );
 }

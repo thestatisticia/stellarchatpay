@@ -8,7 +8,7 @@ const SUGGESTIONS = [
   { label: "Check my XLM balance", command: "balance" },
   { label: "Send a testnet payment", command: "send 10 to G..." },
   { label: "Lock XLM in escrow", command: "escrow 10 to G..." },
-  { label: "Swap XLM to USDC on the DEX", command: "swap 10 xlm to usdc" },
+  { label: "Swap XLM to USDC", command: "swap 10 xlm to usdc" },
   { label: "Show on-chain activity", command: "activity" },
 ];
 

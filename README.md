@@ -205,6 +205,14 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 
 ![Wallet options modal](screenshots/wallet-options-modal.png)
 
+### Mobile — wallet connected
+
+![Mobile wallet connected](screenshots/mobile-wallet-connected.png)
+
+### Mobile — balance check via chat
+
+![Mobile balance success](screenshots/mobile-balance-success.png)
+
 ## Submission Checklist
 
 ### White Belt — complete
@@ -233,9 +241,9 @@ Set `VITE_CONTRACT_ID=CDPSWMZ4HUBU3PX226FUPFKIXYMWFGM3U3WXD7VBYQ2IORZBXXCIJ2OX` 
 - [x] Contract tests (`cargo test`) — 3+
 - [x] Frontend tests (`npm test`) — 3+
 - [x] CI/CD workflow (GitHub Actions)
-- [ ] Escrow deployed on testnet + IDs in env (do on localhost first)
-- [ ] Screenshot: mobile responsive UI
-- [ ] Screenshot: CI pipeline green (after push when Level 2 review is done)
+- [ ] Escrow deployed on testnet + `VITE_ESCROW_CONTRACT_ID` on Vercel
+- [x] Screenshot: mobile responsive UI (wallet connected + balance via chat)
+- [ ] Screenshot: CI pipeline green (after this push)
 - [ ] Screenshot: test output with 3+ passing tests
 - [ ] Demo video (1–2 minutes)
 

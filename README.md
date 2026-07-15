@@ -4,6 +4,8 @@ Send XLM payments through a chat interface on the **Stellar testnet**. Built for
 
 **Live demo:** [https://stellarchatpay.vercel.app/](https://stellarchatpay.vercel.app/)
 
+**Demo video (Orange Belt):** [https://youtu.be/0K8AWoen5S0](https://youtu.be/0K8AWoen5S0)
+
 Instead of traditional forms, you connect a Stellar wallet and type commands like `send 10 to G...` to move testnet XLM. Payments can be logged to a Soroban contract with a live activity feed in chat.
 
 ---
@@ -267,7 +269,7 @@ Set `VITE_ESCROW_CONTRACT_ID=CBFJ5LRLAQRFVASKEAKOTS4HTKQ2AGTLZOEUP75ER7HWMF6PUFR
 - [x] Screenshot: mobile responsive UI (wallet connected + balance via chat)
 - [x] Screenshot: CI pipeline green
 - [x] Screenshot: test output with 3+ passing tests (frontend + contracts)
-- [ ] Demo video (1–2 minutes)
+- [x] Demo video (1–2 minutes) — [https://youtu.be/0K8AWoen5S0](https://youtu.be/0K8AWoen5S0)
 
 ## License
 

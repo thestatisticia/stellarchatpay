@@ -45,11 +45,11 @@ export function useWallet() {
         error instanceof Error ? error.message : "Failed to fetch balance";
       setState((prev) => ({
         ...prev,
-        balance: "0",
+        // Keep prior balance when refresh fails — don't fake 0.00.
         isLoadingBalance: false,
         error: message,
       }));
-      return { balance: "0", exists: false };
+      return { balance: null, exists: false };
     }
   }, []);
 

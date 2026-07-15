@@ -230,6 +230,8 @@ export interface SwapQuote {
   toLabel: string;
   needsTrustline: boolean;
   rate: string;
+  /** Intermediate assets between send and dest (empty = direct path). */
+  path: Asset[];
 }
 
 function swapAssetPair(from: SwapAssetCode, to: SwapAssetCode) {
@@ -254,7 +256,7 @@ function pathMatchesDestination(
   );
 }
 
-function applySlippage(amount: string, percent = 1): string {
+function applySlippage(amount: string, percent = 5): string {
   const value = parseFloat(amount);
   if (Number.isNaN(value) || value <= 0) return amount;
   return Math.max(value * (1 - percent / 100), 0.0000001).toFixed(7);
@@ -265,6 +267,78 @@ function formatRate(sendAmount: string, receiveAmount: string): string {
   const receive = parseFloat(receiveAmount);
   if (Number.isNaN(send) || send <= 0 || Number.isNaN(receive)) return "—";
   return (receive / send).toFixed(7);
+}
+
+function assetFromHorizonPathHop(hop: {
+  asset_type: string;
+  asset_code?: string;
+  asset_issuer?: string;
+}): Asset {
+  if (hop.asset_type === "native") return Asset.native();
+  if (!hop.asset_code || !hop.asset_issuer) {
+    throw new Error("Invalid DEX path hop returned by Horizon.");
+  }
+  return new Asset(hop.asset_code, hop.asset_issuer);
+}
+
+/** Extract readable Horizon submit failures (avoids bare "status code 400"). */
+export function formatHorizonSubmitError(error: unknown): string {
+  const record = error as {
+    message?: string;
+    response?: {
+      status?: number;
+      data?: {
+        title?: string;
+        detail?: string;
+        extras?: {
+          result_codes?: {
+            transaction?: string;
+            operations?: string[];
+          };
+        };
+      };
+    };
+  };
+
+  const extras = record.response?.data?.extras?.result_codes;
+  const opCodes = extras?.operations?.filter(Boolean) ?? [];
+  const txCode = extras?.transaction;
+  const codes = [...(txCode ? [txCode] : []), ...opCodes].map((c) => c.toLowerCase());
+
+  if (codes.some((c) => c.includes("under_dest_min") || c.includes("too_few"))) {
+    return "DEX rate moved before confirm. Run `swap …` again for a fresh quote, then confirm quickly.";
+  }
+  if (codes.some((c) => c.includes("no_trust"))) {
+    return "Missing USDC trustline. Type `trust usdc`, approve it, then try the swap again.";
+  }
+  if (codes.some((c) => c.includes("underfunded"))) {
+    return "Insufficient balance for this swap (include a small XLM fee buffer).";
+  }
+  if (codes.some((c) => c.includes("cross_self"))) {
+    return "Swap path conflicts with your own order-book offers. Try a smaller amount.";
+  }
+  if (codes.some((c) => c.includes("line_full"))) {
+    return "USDC trustline limit reached. Increase it with `trust usdc` or receive less.";
+  }
+
+  if (opCodes.length || txCode) {
+    return `Swap rejected by Horizon (${[txCode, ...opCodes].filter(Boolean).join(", ")}). Try a fresh quote.`;
+  }
+
+  const detail = record.response?.data?.detail ?? record.response?.data?.title;
+  if (detail) return detail;
+
+  if (typeof record.message === "string" && record.message.includes("400")) {
+    return "Swap transaction rejected (400). Rates may have moved — request a new quote and confirm again.";
+  }
+
+  return extractErrorMessageFallback(error);
+}
+
+function extractErrorMessageFallback(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "Something went wrong. Please try again.";
 }
 
 export async function getSwapQuote(
@@ -298,6 +372,7 @@ export async function getSwapQuote(
   }
 
   const receiveAmount = best.destination_amount;
+  const path = (best.path ?? []).map((hop) => assetFromHorizonPathHop(hop));
 
   return {
     fromAsset,
@@ -309,6 +384,7 @@ export async function getSwapQuote(
     toLabel,
     needsTrustline,
     rate: formatRate(best.source_amount, receiveAmount),
+    path,
   };
 }
 
@@ -331,64 +407,83 @@ export async function executeSwap(
   quote: SwapQuote,
   signTransaction: SignTransactionFn
 ): Promise<SwapResult> {
-  const { sendAsset, destAsset, fromLabel, toLabel } = swapAssetPair(
-    quote.fromAsset,
-    quote.toAsset
-  );
-
-  const operationCount = quote.needsTrustline ? 2 : 1;
-  const fee = String(Number(BASE_FEE) * 100 * operationCount);
-
-  const response = await submitSignedTransaction(publicKey, signTransaction, (account) => {
-    const builder = new TransactionBuilder(account, {
-      fee,
-      networkPassphrase: NETWORK_PASSPHRASE,
-    });
-
-    if (quote.needsTrustline) {
-      builder.addOperation(
-        Operation.changeTrust({
-          asset: USDC_ASSET,
-          limit: "1000000",
-        })
-      );
-    }
-
-    builder.addOperation(
-      Operation.pathPaymentStrictSend({
-        destination: publicKey,
-        sendAsset,
-        sendAmount: quote.sendAmount,
-        destAsset,
-        destMin: quote.destMin,
-      })
-    );
-
-    return builder.setTimeout(30).build();
-  });
-
-  let receiveAmount = quote.receiveAmount;
+  let liveQuote: SwapQuote;
   try {
-    const operations = await server
-      .operations()
-      .forTransaction(response.hash)
-      .call();
-    const pathOp = operations.records.find(
-      (op) => op.type === "path_payment_strict_send"
-    ) as { amount?: string } | undefined;
-    if (pathOp?.amount) receiveAmount = pathOp.amount;
-  } catch {
-    // Horizon may lag; keep quoted receive amount.
+    // Refresh quote + trustline at confirm time so thin testnet liquidity doesn't
+    // fail with a bare Horizon 400 between preview and wallet approval.
+    liveQuote = await getSwapQuote(
+      publicKey,
+      quote.fromAsset,
+      quote.sendAmount,
+      quote.toAsset
+    );
+  } catch (error) {
+    throw new Error(formatHorizonSubmitError(error));
   }
 
-  return {
-    hash: response.hash,
-    explorerUrl: getExplorerUrl(response.hash),
-    fromAsset: fromLabel,
-    toAsset: toLabel,
-    sendAmount: quote.sendAmount,
-    receiveAmount,
-  };
+  const { sendAsset, destAsset, fromLabel, toLabel } = swapAssetPair(
+    liveQuote.fromAsset,
+    liveQuote.toAsset
+  );
+
+  const operationCount = liveQuote.needsTrustline ? 2 : 1;
+  const fee = String(Number(BASE_FEE) * 100 * operationCount);
+
+  try {
+    const response = await submitSignedTransaction(publicKey, signTransaction, (account) => {
+      const builder = new TransactionBuilder(account, {
+        fee,
+        networkPassphrase: NETWORK_PASSPHRASE,
+      });
+
+      if (liveQuote.needsTrustline) {
+        builder.addOperation(
+          Operation.changeTrust({
+            asset: USDC_ASSET,
+            limit: "1000000",
+          })
+        );
+      }
+
+      builder.addOperation(
+        Operation.pathPaymentStrictSend({
+          sendAsset,
+          sendAmount: liveQuote.sendAmount,
+          destination: publicKey,
+          destAsset,
+          destMin: liveQuote.destMin,
+          path: liveQuote.path,
+        })
+      );
+
+      return builder.setTimeout(180).build();
+    });
+
+    let receiveAmount = liveQuote.receiveAmount;
+    try {
+      const operations = await server
+        .operations()
+        .forTransaction(response.hash)
+        .call();
+      const pathOp = operations.records.find(
+        (op) => op.type === "path_payment_strict_send"
+      ) as { amount?: string } | undefined;
+      if (pathOp?.amount) receiveAmount = pathOp.amount;
+    } catch {
+      // Horizon may lag; keep quoted receive amount.
+    }
+
+    return {
+      hash: response.hash,
+      explorerUrl: getExplorerUrl(response.hash),
+      fromAsset: fromLabel,
+      toAsset: toLabel,
+      sendAmount: liveQuote.sendAmount,
+      receiveAmount,
+    };
+  } catch (error) {
+    throw error instanceof Error ? error : new Error(formatHorizonSubmitError(error));
+  }
 }
 
 /** @deprecated Use getSwapQuote + executeSwap for the confirm flow. */
@@ -412,7 +507,11 @@ async function submitSignedTransaction(
   const transaction = build(account);
   const signedXdr = await signTransaction(transaction.toXDR(), publicKey);
   const signedTx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
-  return server.submitTransaction(signedTx);
+  try {
+    return await server.submitTransaction(signedTx);
+  } catch (error) {
+    throw new Error(formatHorizonSubmitError(error));
+  }
 }
 
 export async function sendXlmPayment(

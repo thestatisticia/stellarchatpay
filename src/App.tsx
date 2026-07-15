@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ChatWindow } from "./components/ChatWindow";
 import { WalletHeader } from "./components/WalletHeader";
 import { usePaymentEvents } from "./hooks/usePaymentEvents";
@@ -54,7 +54,13 @@ import {
 function App() {
   const wallet = useWallet();
   const { theme, setTheme } = useTheme();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    createMessage({
+      role: "bot",
+      content: WELCOME_MESSAGE,
+      status: "info",
+    }),
+  ]);
   const [input, setInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -95,15 +101,6 @@ function App() {
   );
 
   usePaymentEvents(wallet.isConnected, handleLiveEvent);
-
-  useEffect(() => {
-    addMessage({
-      role: "bot",
-      content: WELCOME_MESSAGE,
-      status: "info",
-    });
-  }, [addMessage]);
-
   const handleConnect = async () => {
     setConnectError(null);
     try {
@@ -478,7 +475,7 @@ function App() {
 
       try {
         patchMessage(pendingId, {
-          content: "Waiting for wallet approval to execute the swap…",
+          content: "Refreshing quote, then waiting for wallet approval…",
         });
         const result = await executeSwap(
           wallet.address,
@@ -589,7 +586,15 @@ function App() {
         content: "Checking balance on Horizon…",
       });
       try {
-        const { balance } = await wallet.refreshBalance(wallet.address);
+        const { balance, exists } = await fetchAccountBalance(wallet.address);
+        await wallet.refreshBalance(wallet.address);
+        if (!exists) {
+          patchMessage(pendingId, {
+            content: "This account is not funded on testnet yet. Type `fund` to get XLM from Friendbot.",
+            status: "error",
+          });
+          return;
+        }
         patchMessage(pendingId, {
           content: "Your XLM balance on testnet.",
           status: "success",
@@ -934,12 +939,13 @@ function App() {
 
   const handleClearChat = () => {
     pendingSwap.current = null;
-    setMessages([]);
-    addMessage({
-      role: "bot",
-      content: WELCOME_MESSAGE,
-      status: "info",
-    });
+    setMessages([
+      createMessage({
+        role: "bot",
+        content: WELCOME_MESSAGE,
+        status: "info",
+      }),
+    ]);
   };
 
   return (

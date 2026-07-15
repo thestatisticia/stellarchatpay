@@ -49,7 +49,9 @@ export function ChatWindow({
   const [activeSuggestion, setActiveSuggestion] = useState(0);
 
   const userMessageCount = messages.filter((m) => m.role === "user").length;
-  const isHeroMode = userMessageCount === 0;
+  // Stay in hero only for a fresh connected session (welcome alone).
+  // After connect / clear with history, show the chat thread.
+  const isHeroMode = isConnected && userMessageCount === 0 && messages.length <= 1;
   const hasPendingBot = messages.some((m) => m.role === "bot" && m.status === "pending");
   const showTyping = isProcessing && !hasPendingBot;
 

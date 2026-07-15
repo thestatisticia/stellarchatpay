@@ -84,6 +84,18 @@ function parseRawMessage(message: string): string {
   }
 
   if (
+    lower.includes("under_dest_min") ||
+    lower.includes("too_few") ||
+    lower.includes("dex rate moved")
+  ) {
+    return "DEX rate moved before confirm. Run `swap …` again for a fresh quote, then confirm quickly.";
+  }
+
+  if (lower.includes("no_trust") || lower.includes("missing usdc trustline")) {
+    return "Missing USDC trustline. Type `trust usdc`, approve it, then try the swap again.";
+  }
+
+  if (
     lower.includes("op_no_destination") ||
     lower.includes("no_destination") ||
     lower.includes("destination account does not exist")
@@ -97,6 +109,13 @@ function parseRawMessage(message: string): string {
     lower.includes("invalid account id")
   ) {
     return "Invalid Stellar address. Public keys are 56 characters and start with `G` — copy the full address from your wallet.";
+  }
+
+  if (
+    lower.includes("status code 400") ||
+    lower.includes("request failed with status code")
+  ) {
+    return "Swap rejected by the network (rates or path changed). Run `swap …` again for a fresh quote, then confirm quickly.";
   }
 
   return message;

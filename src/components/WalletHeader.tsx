@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { BotAvatar } from "./BotAvatar";
+import { HeaderNav, MobileBottomNav, SettingsNavLink } from "./HeaderNav";
 import { ThemeToggle } from "./ThemeToggle";
 import { truncateAddress } from "../lib/stellar";
 
@@ -12,7 +14,7 @@ interface WalletHeaderProps {
   onSetTheme: (theme: "light" | "dark") => void;
   onConnect: () => void;
   onDisconnect: () => void;
-  onClearChat: () => void;
+  onClearChat?: () => void;
 }
 
 function formatBalance(balance: string | null): string {
@@ -64,79 +66,74 @@ export function WalletHeader({
   onClearChat,
 }: WalletHeaderProps) {
   return (
-    <header className="app-header sticky top-0 z-20">
-      <div className="header-inner">
-        <div className="header-left">
-          <div className="agent-pill">
-            <BotAvatar size="sm" />
-            <span className="agent-pill-name">StellarChat Pay</span>
-            <svg
-              className="agent-pill-chevron"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-            </svg>
+    <>
+      <header className="app-header sticky top-0 z-20">
+        <div className="header-inner header-inner-grid">
+          <div className="header-brand">
+            <Link to="/" className="brand-link" aria-label="Orbit home">
+              <BotAvatar size="sm" />
+              <span className="brand-name">Orbit</span>
+            </Link>
           </div>
 
-          <button
-            type="button"
-            onClick={onClearChat}
-            className="header-icon-btn"
-            aria-label="Clear chat"
-            title="Clear chat"
-          >
-            <RefreshIcon />
-          </button>
+          <HeaderNav className="header-nav-desktop" />
+
+          <div className="header-actions">
+            {onClearChat && (
+              <button
+                type="button"
+                onClick={onClearChat}
+                className="header-icon-btn header-clear-chat"
+                aria-label="Clear chat"
+                title="Clear chat"
+              >
+                <RefreshIcon />
+              </button>
+            )}
+
+            <ThemeToggle theme={theme} onSetTheme={onSetTheme} />
+            <SettingsNavLink />
+
+            {isConnected && address ? (
+              <button
+                type="button"
+                onClick={onDisconnect}
+                className="header-wallet-pill"
+                title="Click to disconnect"
+              >
+                <span className="header-wallet-icon">
+                  <WalletIcon />
+                </span>
+                <span className="header-wallet-address font-mono">
+                  {truncateAddress(address, 4)}
+                </span>
+                <span className="header-wallet-balance tabular-nums">
+                  {isLoadingBalance ? (
+                    <span className="header-wallet-stat-skeleton" />
+                  ) : (
+                    <>
+                      <span className="header-wallet-balance-value">{formatBalance(balance)}</span>
+                      <span className="header-wallet-balance-unit"> XLM</span>
+                    </>
+                  )}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onConnect}
+                disabled={isConnecting}
+                className="header-connect-btn"
+              >
+                <span className="header-connect-label">
+                  {isConnecting ? "Connecting…" : "Connect Wallet"}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
-
-        <div className="header-actions">
-          {isConnected && address && (
-            <button
-              type="button"
-              onClick={onDisconnect}
-              className="header-wallet-pill"
-              title="Click to disconnect"
-            >
-              <span className="header-wallet-icon">
-                <WalletIcon />
-              </span>
-              <span className="header-wallet-address font-mono">
-                {truncateAddress(address, 4)}
-              </span>
-              <span className="header-wallet-balance tabular-nums">
-                {isLoadingBalance ? (
-                  <span className="header-wallet-stat-skeleton" />
-                ) : (
-                  <>
-                    <span className="header-wallet-balance-value">{formatBalance(balance)}</span>
-                    <span className="header-wallet-balance-unit"> XLM</span>
-                  </>
-                )}
-              </span>
-            </button>
-          )}
-
-          <ThemeToggle theme={theme} onSetTheme={onSetTheme} />
-
-          {!isConnected && (
-            <button
-              type="button"
-              onClick={onConnect}
-              disabled={isConnecting}
-              className="header-connect-btn"
-            >
-              <WalletIcon />
-              <span className="header-connect-label">
-                {isConnecting ? "Connecting…" : "Connect Wallet"}
-              </span>
-            </button>
-          )}
-        </div>
-      </div>
-    </header>
+      </header>
+      <MobileBottomNav />
+    </>
   );
 }

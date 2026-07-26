@@ -1,4 +1,12 @@
-import { useCallback, useState } from "react";
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   disconnectWalletKit,
   openWalletModal,
@@ -16,7 +24,18 @@ interface WalletState {
   error: string | null;
 }
 
-export function useWallet() {
+export interface WalletContextValue extends WalletState {
+  isConnected: boolean;
+  connect: () => Promise<{ address: string; walletName: string; accountExists: boolean }>;
+  disconnect: () => Promise<void>;
+  refreshBalance: (address: string) => Promise<{ balance: string | null; exists: boolean }>;
+  fundAccount: () => Promise<Awaited<ReturnType<typeof fundTestnetAccount>>>;
+  signTransaction: SignTransactionFn;
+}
+
+const WalletContext = createContext<WalletContextValue | null>(null);
+
+export function WalletProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WalletState>({
     address: null,
     walletName: null,
@@ -45,7 +64,6 @@ export function useWallet() {
         error instanceof Error ? error.message : "Failed to fetch balance";
       setState((prev) => ({
         ...prev,
-        // Keep prior balance when refresh fails — don't fake 0.00.
         isLoadingBalance: false,
         error: message,
       }));
@@ -53,7 +71,11 @@ export function useWallet() {
     }
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (): Promise<{
+    address: string;
+    walletName: string;
+    accountExists: boolean;
+  }> => {
     setState((prev) => ({ ...prev, isConnecting: true, error: null }));
     try {
       const { address, walletName } = await openWalletModal();
@@ -71,6 +93,7 @@ export function useWallet() {
     } catch (error) {
       setState((prev) => ({ ...prev, isConnecting: false, isLoadingBalance: false }));
       classifyAndThrow(error);
+      throw error;
     }
   }, [refreshBalance]);
 
@@ -100,13 +123,27 @@ export function useWallet() {
     []
   );
 
-  return {
-    ...state,
-    isConnected: Boolean(state.address),
-    connect,
-    disconnect,
-    refreshBalance,
-    fundAccount,
-    signTransaction,
-  };
+  const value = useMemo<WalletContextValue>(
+    () => ({
+      ...state,
+      isConnected: Boolean(state.address),
+      connect,
+      disconnect,
+      refreshBalance,
+      fundAccount,
+      signTransaction,
+    }),
+    [state, connect, disconnect, refreshBalance, fundAccount, signTransaction]
+  );
+
+  return createElement(WalletContext.Provider, { value }, children);
+}
+
+/** Shared wallet session — survives route changes (Chat → Activity → Insights). */
+export function useWallet(): WalletContextValue {
+  const ctx = useContext(WalletContext);
+  if (!ctx) {
+    throw new Error("useWallet must be used within WalletProvider");
+  }
+  return ctx;
 }

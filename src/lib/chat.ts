@@ -358,20 +358,7 @@ export function shouldFillSuggestionOnly(command: string): boolean {
   return /G\.\.\.|<\w+>|\.\.\./i.test(command);
 }
 
-export const WELCOME_MESSAGE = `Hey — I'm your Stellar payment assistant on **testnet**.
-
-Tap a quick action below or type a command:
-
-• \`balance\` — check your XLM
-• \`balance G...\` — check any wallet's balance
-• \`fund\` — fund your wallet via Friendbot
-• \`fund G...\` — fund any testnet wallet
-• \`activity\` — live payment feed from the Soroban contract
-• \`swap 10 xlm to usdc\` — get a quote, then type \`confirm\`
-• \`send 10 to G...\` — pay someone (logged on-chain)
-• \`escrow 10 to G...\` — lock XLM, then \`escrow release <id>\`
-
-Connect via **Freighter, Albedo, or xBull** using the wallet picker.`;
+export const WELCOME_MESSAGE = `Connected. Ask me to check your balance, send XLM, swap, or create escrow.`;
 
 export const HELP_MESSAGE = `**Commands**
 

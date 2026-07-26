@@ -1,9 +1,9 @@
-# StellarChat Pay
+# Orbit (prototype: StellarChat Pay)
 
-Send XLM payments through a chat interface on the **Stellar testnet**. Built for the RiseIn Stellar Developer Challenge.
+Conversational finance on the **Stellar testnet** — payments, escrow, swaps, and activity through chat. Built for the RiseIn Stellar Journey (Levels 1–4).
 
-**Live demo:** [https://stellarchatpay.vercel.app/](https://stellarchatpay.vercel.app/)
-
+**Product:** Orbit  
+**Live demo:** [https://stellarchatpay.vercel.app/](https://stellarchatpay.vercel.app/)  
 **Demo video (Orange Belt):** [https://youtu.be/0K8AWoen5S0](https://youtu.be/0K8AWoen5S0)
 
 Instead of traditional forms, you connect a Stellar wallet and type commands like `send 10 to G...` to move testnet XLM. Payments can be logged to a Soroban contract with a live activity feed in chat.
@@ -30,6 +30,18 @@ Instead of traditional forms, you connect a Stellar wallet and type commands lik
 - **CI/CD** — GitHub Actions (frontend tests + contract tests)
 - **Automated tests** — Vitest (frontend) + `cargo test` (contracts)
 - **Production docs** — architecture + deploy workflow in `contracts/README.md`
+
+## Level 4 — Green Belt (in progress)
+
+Production MVP hardening for the approved **Orbit** idea:
+
+- **Onboarding checklist** — connect → fund → balance → send
+- **In-app feedback** — rating + comment (local + optional Formspree via `VITE_FEEDBACK_ENDPOINT`)
+- **Analytics** — Vercel Analytics + custom event tracking (connect, send, escrow, feedback)
+- **Error boundary** — crash recovery UI
+- **User evidence** — see [`docs/users.md`](docs/users.md) and [`docs/feedback-summary.md`](docs/feedback-summary.md)
+
+Still needed for submission: **10+ real users** with wallet proof, analytics screenshot, L4 demo video, feedback summary fill-in.
 
 ---
 
@@ -270,6 +282,20 @@ Set `VITE_ESCROW_CONTRACT_ID=CBFJ5LRLAQRFVASKEAKOTS4HTKQ2AGTLZOEUP75ER7HWMF6PUFR
 - [x] Screenshot: CI pipeline green
 - [x] Screenshot: test output with 3+ passing tests (frontend + contracts)
 - [x] Demo video (1–2 minutes) — [https://youtu.be/0K8AWoen5S0](https://youtu.be/0K8AWoen5S0)
+
+### Green Belt (Level 4) — checklist
+
+- [x] Production MVP (payments, escrow, swaps, mobile, loading/errors)
+- [x] Public GitHub + 15+ commits
+- [x] Live deployment + testnet contracts
+- [x] Analytics integration (Vercel Analytics + product events)
+- [x] User feedback collection UI
+- [x] First-run onboarding checklist
+- [ ] Screenshot: analytics / monitoring setup (Vercel Analytics dashboard)
+- [ ] Screenshot: feedback UI + product UI (desktop + mobile)
+- [ ] Proof of 10+ user wallet interactions — fill [`docs/users.md`](docs/users.md)
+- [ ] Basic user feedback summary — fill [`docs/feedback-summary.md`](docs/feedback-summary.md)
+- [ ] Level 4 demo video (onboarding → payment/escrow → feedback → analytics)
 
 ## License
 

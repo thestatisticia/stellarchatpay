@@ -1,62 +1,48 @@
-import { useEffect, useMemo } from "react";
-import { useLiveMetrics } from "../hooks/useLiveMetrics";
+import { useEffect } from "react";
+import { usePublicStats } from "../hooks/usePublicStats";
+import { useRemoteFeedback } from "../hooks/useRemoteFeedback";
 import { trackEvent } from "../lib/analytics";
 
+function formatWhen(iso: string) {
+  try {
+    return new Date(iso).toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function topActionLabel(stats: {
+  sends: number;
+  swaps: number;
+  escrows: number;
+  funds: number;
+}) {
+  const ranked: [string, number][] = [
+    ["Transfers", stats.sends],
+    ["Swaps", stats.swaps],
+    ["Escrow", stats.escrows],
+    ["Funding", stats.funds],
+  ];
+  const top = ranked.sort((a, b) => b[1] - a[1])[0];
+  if (!top || top[1] === 0) return "—";
+  return top[0];
+}
+
 export function InsightsPage() {
-  const metrics = useLiveMetrics();
+  const { stats, loading: statsLoading } = usePublicStats();
+  const feedback = useRemoteFeedback();
 
   useEffect(() => {
     trackEvent("page_view", { page: "insights" });
   }, []);
 
-  const insight = useMemo(() => {
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    const monthRows = metrics.interactions.filter((r) => new Date(r.at) >= monthStart);
-    const spent = monthRows
-      .filter((r) => r.action === "send" || r.action === "escrow")
-      .reduce((sum, r) => sum + (Number.parseFloat(r.amount ?? "0") || 0), 0);
-
-    const receivedApprox = monthRows
-      .filter((r) => r.action === "fund")
-      .reduce((sum, r) => sum + (Number.parseFloat(r.amount ?? "0") || 0), 0);
-
-    const actionCounts = monthRows.reduce<Record<string, number>>((acc, r) => {
-      acc[r.action] = (acc[r.action] ?? 0) + 1;
-      return acc;
-    }, {});
-
-    const topAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
-
-    const dayCounts = monthRows.reduce<Record<string, number>>((acc, r) => {
-      const day = new Date(r.at).toLocaleDateString(undefined, { weekday: "long" });
-      acc[day] = (acc[day] ?? 0) + 1;
-      return acc;
-    }, {});
-    const mostActiveDay = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
-
-    const categoryLabel =
-      topAction === "send"
-        ? "Transfers"
-        : topAction === "swap"
-          ? "Swaps"
-          : topAction === "escrow"
-            ? "Escrow"
-            : topAction === "fund"
-              ? "Funding"
-              : topAction;
-
-    return {
-      spent,
-      receivedApprox,
-      categoryLabel,
-      mostActiveDay,
-      monthActions: monthRows.length,
-      connects: metrics.connects,
-    };
-  }, [metrics]);
+  const publicScore = feedback.avgRating;
+  const topActivity = topActionLabel(stats);
 
   return (
     <div className="metrics-page">
@@ -64,70 +50,142 @@ export function InsightsPage() {
         <div>
           <p className="metrics-eyebrow">
             <span className="live-dot" aria-hidden />
-            Live
+            Live · public
           </p>
           <h1>Insights</h1>
-          <p className="metrics-sub">A simple read on how you’ve been using Orbit this month.</p>
+          <p className="metrics-sub">
+            Orbit product metrics shared with everyone — usage, wallets, and anonymous feedback.
+            Personal balances live on Activity.
+          </p>
         </div>
       </header>
 
-      <section className="metrics-grid insights-grid" aria-label="Insights">
+      {stats.source === "unavailable" && !statsLoading && (
+        <p className="metrics-panel-note insights-setup-note">
+          Shared stats need the public tables. Run{" "}
+          <code className="code-inline">docs/supabase-public-stats.sql</code> in the Supabase SQL
+          Editor, then refresh.
+        </p>
+      )}
+
+      <section className="metrics-grid insights-grid" aria-label="Public product insights">
         <article className="metric-card metric-card-wide">
-          <p className="metric-label">This month · Spent</p>
-          <p className="metric-value">{insight.spent.toFixed(2)} <span className="metric-unit">XLM</span></p>
+          <p className="metric-label">Unique wallets</p>
+          <p className="metric-value">{stats.uniqueWallets}</p>
         </article>
         <article className="metric-card metric-card-wide">
-          <p className="metric-label">This month · Funded</p>
-          <p className="metric-value">
-            {insight.receivedApprox > 0 ? insight.receivedApprox.toFixed(0) : "—"}{" "}
-            <span className="metric-unit">XLM</span>
-          </p>
+          <p className="metric-label">Wallet connects</p>
+          <p className="metric-value">{stats.connects}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Total actions</p>
+          <p className="metric-value">{stats.totalActions}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Top activity</p>
-          <p className="metric-value metric-value-sm">{insight.categoryLabel}</p>
+          <p className="metric-value metric-value-sm">{topActivity}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Most active day</p>
-          <p className="metric-value metric-value-sm">{insight.mostActiveDay}</p>
+          <p className="metric-label">Sends</p>
+          <p className="metric-value">{stats.sends}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Actions</p>
-          <p className="metric-value">{insight.monthActions}</p>
+          <p className="metric-label">Swaps</p>
+          <p className="metric-value">{stats.swaps}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Wallet connects</p>
-          <p className="metric-value">{insight.connects}</p>
+          <p className="metric-label">Escrows</p>
+          <p className="metric-value">{stats.escrows}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Funds</p>
+          <p className="metric-value">{stats.funds}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Successful txs</p>
+          <p className="metric-value">{stats.txSuccess}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Tx errors</p>
+          <p className="metric-value">{stats.txErrors}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Feedback score</p>
-          <p className="metric-value">
-            {metrics.avgRating == null ? "—" : metrics.avgRating.toFixed(1)}
-          </p>
+          <p className="metric-value">{publicScore == null ? "—" : publicScore.toFixed(1)}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Unique wallets</p>
-          <p className="metric-value">{metrics.uniqueWallets}</p>
+          <p className="metric-label">Feedback responses</p>
+          <p className="metric-value">{feedback.entries.length}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Page views</p>
+          <p className="metric-value">{stats.pageViews}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Onboarding done</p>
+          <p className="metric-value">{stats.onboardingComplete}</p>
         </article>
       </section>
 
-      <section className="metrics-panel">
-        <h2>Live pulse</h2>
-        {metrics.events.length === 0 ? (
-          <p className="metrics-empty">Use Chat to generate live product events.</p>
-        ) : (
-          <ul className="metrics-feed">
-            {metrics.events.slice(0, 12).map((event) => (
-              <li key={event.id} className="metrics-feed-item">
-                <span className="metrics-feed-time">
-                  {new Date(event.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-                <span className="metrics-feed-type">{event.type.replace(/_/g, " ")}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <div className="metrics-columns">
+        <section className="metrics-panel">
+          <h2>
+            Live pulse
+            <span className="feedback-source-tag">App-wide</span>
+          </h2>
+          {statsLoading ? (
+            <p className="metrics-empty">Loading live events…</p>
+          ) : stats.pulse.length === 0 ? (
+            <p className="metrics-empty">
+              No shared events yet. Connect wallets and use Chat — activity appears here for
+              everyone.
+            </p>
+          ) : (
+            <ul className="metrics-feed">
+              {stats.pulse.map((event) => (
+                <li key={event.id} className="metrics-feed-item">
+                  <span className="metrics-feed-time">
+                    {new Date(event.at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span className="metrics-feed-type">{event.event.replace(/_/g, " ")}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="metrics-panel">
+          <h2>
+            Product feedback
+            <span className="feedback-source-tag">Anonymous</span>
+          </h2>
+          {feedback.loading ? (
+            <p className="metrics-empty">Loading feedback…</p>
+          ) : feedback.entries.length === 0 ? (
+            <p className="metrics-empty">
+              No feedback yet. Submit from Settings or after a successful payment.
+              {feedback.error ? ` (${feedback.error})` : ""}
+            </p>
+          ) : (
+            <ul className="feedback-live-list">
+              {feedback.entries.map((entry, i) => (
+                <li key={`${entry.at}-${i}`} className="feedback-live-item">
+                  <div className="feedback-live-top">
+                    <span className="feedback-live-stars">{"★".repeat(entry.rating)}</span>
+                    <span className="feedback-live-when">{formatWhen(entry.at)}</span>
+                  </div>
+                  <p className="feedback-live-comment">
+                    {entry.comment || <em>No comment</em>}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

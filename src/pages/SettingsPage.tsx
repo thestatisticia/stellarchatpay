@@ -71,7 +71,14 @@ export function SettingsPage() {
               Disconnect
             </button>
           ) : (
-            <button type="button" className="header-connect-btn" onClick={() => void wallet.connect()}>
+            <button
+              type="button"
+              className="header-connect-btn"
+              onClick={() => {
+                wallet.clearError();
+                void wallet.connect().catch(() => {});
+              }}
+            >
               Connect
             </button>
           )}

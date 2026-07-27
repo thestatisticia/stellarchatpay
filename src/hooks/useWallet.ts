@@ -13,7 +13,7 @@ import {
   signWithWalletKit,
 } from "../lib/wallet-kit";
 import { fetchAccountBalance, fundTestnetAccount, type SignTransactionFn } from "../lib/stellar";
-import { classifyAndThrow } from "../lib/errors";
+import { classifyAndThrow, formatWalletError } from "../lib/errors";
 
 interface WalletState {
   address: string | null;
@@ -28,6 +28,7 @@ export interface WalletContextValue extends WalletState {
   isConnected: boolean;
   connect: () => Promise<{ address: string; walletName: string; accountExists: boolean }>;
   disconnect: () => Promise<void>;
+  clearError: () => void;
   refreshBalance: (address: string) => Promise<{ balance: string | null; exists: boolean }>;
   fundAccount: () => Promise<Awaited<ReturnType<typeof fundTestnetAccount>>>;
   signTransaction: SignTransactionFn;
@@ -44,6 +45,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     isLoadingBalance: false,
     error: null,
   });
+
+  const clearError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: null }));
+  }, []);
 
   const refreshBalance = useCallback(async (address: string) => {
     setState((prev) => ({
@@ -86,12 +91,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         isConnecting: false,
         balance: null,
         isLoadingBalance: true,
+        error: null,
       }));
 
       const { exists } = await refreshBalance(address);
       return { address, walletName, accountExists: exists };
     } catch (error) {
-      setState((prev) => ({ ...prev, isConnecting: false, isLoadingBalance: false }));
+      const message = formatWalletError(error);
+      setState((prev) => ({
+        ...prev,
+        isConnecting: false,
+        isLoadingBalance: false,
+        error: message,
+      }));
       classifyAndThrow(error);
       throw error;
     }
@@ -129,11 +141,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       isConnected: Boolean(state.address),
       connect,
       disconnect,
+      clearError,
       refreshBalance,
       fundAccount,
       signTransaction,
     }),
-    [state, connect, disconnect, refreshBalance, fundAccount, signTransaction]
+    [state, connect, disconnect, clearError, refreshBalance, fundAccount, signTransaction]
   );
 
   return createElement(WalletContext.Provider, { value }, children);

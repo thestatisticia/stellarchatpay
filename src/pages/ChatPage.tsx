@@ -146,7 +146,7 @@ function ChatPage() {
     try {
       const { address, walletName, accountExists } = await wallet.connect();
       setConnectError(null);
-      trackEvent("wallet_connect", { wallet: walletName });
+      trackEvent("wallet_connect", { wallet: walletName, address });
       markOnboarding("connect");
       addMessage({ role: "system", content: `Connected via ${walletName}` });
       addMessage({

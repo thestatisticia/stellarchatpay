@@ -5,6 +5,7 @@ import {
   persistWalletInteractions,
   type WalletInteraction,
 } from "./metricsStore";
+import { publishPublicEvent, registerPublicWallet } from "./publicStats";
 
 export type AnalyticsEvent =
   | "wallet_connect"
@@ -32,12 +33,20 @@ const MAX_LOCAL_INTERACTIONS = 100;
 
 function safeTrack(event: AnalyticsEvent, props?: Record<string, string | number | boolean>) {
   try {
-    track(event, props);
+    // Never send wallet addresses to Vercel analytics.
+    const { address: _address, ...safeProps } = props ?? {};
+    void _address;
+    track(event, Object.keys(safeProps).length ? safeProps : undefined);
   } catch {
     // Analytics must never break the app.
   }
 
   appendMetricEvent(event, props);
+  publishPublicEvent(event);
+
+  if (event === "wallet_connect" && typeof props?.address === "string") {
+    registerPublicWallet(props.address);
+  }
 
   if (import.meta.env.DEV) {
     console.debug("[analytics]", event, props ?? {});
@@ -59,6 +68,7 @@ export function recordWalletInteraction(entry: Omit<WalletInteraction, "at">) {
   trackEvent("tx_success", {
     action: entry.action,
     hasTx: Boolean(entry.txHash),
+    address: entry.address,
   });
 }
 

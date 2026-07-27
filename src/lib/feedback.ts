@@ -4,6 +4,7 @@ import {
   persistFeedback,
   type FeedbackEntry,
 } from "./metricsStore";
+import { getSupabase, isSupabaseConfigured, type FeedbackRow } from "./supabase";
 
 export type { FeedbackEntry };
 
@@ -32,9 +33,36 @@ function saveLocal(entry: FeedbackEntry) {
   notifyMetricsChanged();
 }
 
+function rowToEntry(row: FeedbackRow): FeedbackEntry {
+  return {
+    rating: row.rating,
+    comment: row.comment ?? "",
+    wallet: null,
+    at: row.created_at,
+  };
+}
+
+/** Latest feedback from Supabase (shared across all users). Falls back to local. */
+export async function fetchFeedback(limit = 40): Promise<FeedbackEntry[]> {
+  const supabase = getSupabase();
+  if (!supabase) return getLocalFeedback();
+
+  const { data, error } = await supabase
+    .from("feedback")
+    .select("id,rating,comment,created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) {
+    console.warn("[feedback] fetch failed, using local", error?.message);
+    return getLocalFeedback();
+  }
+
+  return (data as FeedbackRow[]).map(rowToEntry);
+}
+
 /**
- * Submit feedback to optional Formspree / webhook endpoint, and always keep a local copy.
- * Set VITE_FEEDBACK_ENDPOINT to a Formspree URL (https://formspree.io/f/xxxx) or similar POST endpoint.
+ * Submit feedback to Supabase when configured; always keeps a local copy.
  */
 export async function submitFeedback(input: {
   rating: number;
@@ -52,8 +80,35 @@ export async function submitFeedback(input: {
     return { ok: false, error: "Pick a rating from 1 to 5." };
   }
 
-  const endpoint = import.meta.env.VITE_FEEDBACK_ENDPOINT?.trim();
+  if (isSupabaseConfigured) {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { ok: false, error: "Supabase is not configured." };
+    }
 
+    // Never publish wallet addresses — feedback is anonymous product input only.
+    const { error } = await supabase.from("feedback").insert({
+      rating: entry.rating,
+      comment: entry.comment || "",
+      wallet: null,
+    });
+
+    if (error) {
+      return {
+        ok: false,
+        error:
+          error.message.includes("relation") || error.code === "42P01"
+            ? "Feedback table missing. Run docs/supabase-feedback.sql in Supabase SQL Editor."
+            : `Could not save feedback: ${error.message}`,
+      };
+    }
+
+    saveLocal(entry);
+    return { ok: true };
+  }
+
+  // Optional Formspree fallback
+  const endpoint = import.meta.env.VITE_FEEDBACK_ENDPOINT?.trim();
   if (endpoint) {
     try {
       const res = await fetch(endpoint, {

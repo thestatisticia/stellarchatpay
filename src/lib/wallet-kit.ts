@@ -36,7 +36,7 @@ const WALLET_INSTALL_URLS: Record<string, string> = {
   albedo: "https://albedo.link",
 };
 
-/** Use Freighter's official API — do NOT rely on window.freighter (often unset). */
+/** Prefer trying Freighter over a brittle pre-check (false often means “not linked yet”). */
 async function isFreighterInstalled(): Promise<boolean> {
   try {
     const result = await freighterIsConnected();
@@ -53,9 +53,10 @@ async function isFreighterInstalled(): Promise<boolean> {
       }
     }
 
-    return false;
+    // API answered without throwing — let the real connect flow decide.
+    // Blocking here caused false “not installed” alerts when Freighter was present.
+    return true;
   } catch {
-    // Detection failed — don't block; let Freighter connect flow try.
     return true;
   }
 }
@@ -108,12 +109,11 @@ function mapConnectFailure(wallet: ISupportedWallet, error: unknown): unknown {
     return error;
   }
 
+  // Only remap clear install failures — "not connected" is not "not installed".
   if (
     key.includes("freighter") &&
-    (message.includes("not connected") ||
-      message.includes("not installed") ||
-      message.includes("not found") ||
-      message.includes("could not find") ||
+    (message.includes("not installed") ||
+      message.includes("could not find extension") ||
       message.includes("no freighter"))
   ) {
     return walletNotFoundError(name, WALLET_INSTALL_URLS.freighter);

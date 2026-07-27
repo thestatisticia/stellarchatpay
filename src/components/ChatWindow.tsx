@@ -5,6 +5,7 @@ import {
   type ChatMessage,
 } from "../lib/chat";
 import { ChatMessageList, TypingIndicator } from "./ChatMessageList";
+import { HowItWorksSection } from "./HowItWorksSection";
 import { SuggestionLinks } from "./SuggestionLinks";
 
 interface ChatWindowProps {
@@ -186,57 +187,71 @@ export function ChatWindow({
   if (!isConnected) {
     return (
       <main className={`chat-shell chat-shell-landing ${className}`}>
-        <div className="landing-layout">
-          <div className="landing-orbit" aria-hidden />
+        <div className="landing-scroll">
+          <div className="landing-layout">
+            <div className="landing-orbit" aria-hidden />
 
-          <p className="landing-badge">
-            <span className="landing-badge-dot" />
-            Live on Stellar testnet
-          </p>
+            <p className="landing-badge">
+              <span className="landing-badge-dot" />
+              Live on Stellar testnet
+            </p>
 
-          <h1 className="landing-title">
-            Banking on Stellar,
-            <br />
-            through conversation.
-          </h1>
-          <p className="landing-sub">
-            Send payments, swap assets, and create escrow — all from a single chat.
-          </p>
+            <h1 className="landing-title">
+              Banking on Stellar,
+              <br />
+              through conversation.
+            </h1>
+            <p className="landing-sub">
+              Send payments, swap assets, and create escrow — all from a single chat.
+            </p>
 
-          <div className="landing-cta-row">
-            <button
-              type="button"
-              onClick={onConnect}
-              disabled={isConnecting}
-              className="hero-connect-btn"
-            >
-              {isConnecting ? "Launching…" : "Launch app"}
-            </button>
-          </div>
-
-          {connectError && (
-            <div className="connect-error-banner" role="alert">
-              <div className="connect-error-banner-body">
-                <span className="status-badge badge-error">Failed</span>
-                <p>{connectError}</p>
-              </div>
-              {onDismissConnectError && (
-                <button
-                  type="button"
-                  className="connect-error-dismiss"
-                  onClick={onDismissConnectError}
-                  aria-label="Dismiss error"
-                >
-                  ×
-                </button>
-              )}
+            <div className="landing-cta-row">
+              <button
+                type="button"
+                onClick={onConnect}
+                disabled={isConnecting}
+                className="hero-connect-btn"
+              >
+                {isConnecting ? "Launching…" : "Launch app"}
+              </button>
+              <a href="#how-it-works" className="hero-secondary-btn">
+                How it works
+              </a>
             </div>
-          )}
 
-          <div className="landing-prompts">
-            <p className="landing-prompts-label">Try asking things like</p>
-            <SuggestionLinks disabled variant="examples" onSelect={() => undefined} />
+            {connectError && (
+              <div className="connect-error-banner" role="alert">
+                <div className="connect-error-banner-body">
+                  <span className="status-badge badge-error">Failed</span>
+                  <p>{connectError}</p>
+                </div>
+                {onDismissConnectError && (
+                  <button
+                    type="button"
+                    className="connect-error-dismiss"
+                    onClick={onDismissConnectError}
+                    aria-label="Dismiss error"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="landing-prompts">
+              <p className="landing-prompts-label">Try asking things like</p>
+              <SuggestionLinks disabled variant="examples" onSelect={() => undefined} />
+            </div>
+
+            <a href="#how-it-works" className="landing-scroll-hint" aria-label="Scroll to how it works">
+              <span>Scroll</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M6 13l6 6 6-6" />
+              </svg>
+            </a>
           </div>
+
+          <HowItWorksSection onLaunch={onConnect} isConnecting={isConnecting} />
         </div>
 
         <div className="chat-input-area chat-input-area-landing">{renderComposer()}</div>
